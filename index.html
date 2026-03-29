@@ -1013,12 +1013,13 @@ async function sendNotifications(order) {
         total:          '₪' + order.total,
         notes:          order.notes || '—',
         date:           order.date + ' ' + order.time,
-        message:        '🚑 הזמנה חדשה התקבלה!\n\nמספר הזמנה: ' + order.orderNum + '\nשם המזמין: ' + order.name + '\nטלפון: ' + order.phone + '\n\nפירוט:\n' + itemsList + '\n\nסה"כ לתשלום: ₪' + order.total + (order.notes ? '\nהערות: ' + order.notes : '')
+        message:        '🚑 הזמנה חדשה!\n\nמספר: ' + order.orderNum + '\nשם: ' + order.name + '\nטלפון: ' + order.phone + '\nאימייל: ' + (order.email||'—') + '\n\n' + itemsList + '\n\nסה"כ: ₪' + order.total + (order.notes ? '\nהערות: ' + order.notes : '') + '\n\nתאריך: ' + order.date + ' ' + order.time
       });
+      console.log('✅ מייל נשלח למנהל');
     } catch(e) { console.error('שגיאה במייל מנהל:', e); }
   }
 
-  // מייל אישור ללקוח (ניסוח יפה)
+  // מייל אישור ללקוח
   if (order.email) {
     try {
       await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
@@ -1026,8 +1027,15 @@ async function sendNotifications(order) {
         to_name:        order.name,
         order_num:      order.orderNum,
         customer_name:  order.name,
-        message:        'היי ' + order.name + '! 👋\n\nחדשות מעולות - קיבלנו את ההזמנה שלך!\nאנחנו כבר מתחילים לעבוד על זה כדי שהחולצה החדשה תגיע אליך כמה שיותר מהר. 👕\n\nמספר הזמנה למעקב: ' + order.orderNum + '\n\nמה הזמנת?\n' + itemsList + '\n\nסה"כ: ₪' + order.total + '\n\nברגע שהחבילה תהיה מוכנה לאיסוף, נשלח לך עדכון נוסף. בינתיים, אם יש לך שאלות, אנחנו כאן.\n\nתתחדש,\nצוות ' + orgName
+        customer_phone: order.phone,
+        customer_email: order.email,
+        items:          itemsList,
+        total:          '₪' + order.total,
+        notes:          order.notes || '—',
+        date:           order.date + ' ' + order.time,
+        message:        'שלום ' + order.name + '! 👋\n\nההזמנה שלך התקבלה בהצלחה! ✅\n\nמספר הזמנה: ' + order.orderNum + '\n\n' + itemsList + '\n\nסה"כ: ₪' + order.total + '\n\nשמור את מספר ההזמנה למעקב באתר.\n\nתודה מ' + orgName + '! 🚑'
       });
+      console.log('✅ מייל נשלח ללקוח');
     } catch(e) { console.error('שגיאה במייל לקוח:', e); }
   }
 
@@ -1036,32 +1044,52 @@ async function sendNotifications(order) {
     try {
       await fetch('https://ntfy.sh/' + encodeURIComponent(D.settings.ntfy), {
         method: 'POST',
-        body: '📥 הזמנה חדשה! ' + order.name + ' (' + order.phone + ') – ₪' + order.total,
+        body: '📥 הזמנה חדשה! ' + order.name + ' (' + order.phone + ') – ' + order.items.map(i => i.product + ' ' + i.size + '×' + i.qty).join(', ') + ' | ₪' + order.total,
         headers: { 'Title': '🚑 הזמנה חדשה – ' + order.orderNum, 'Priority': 'high', 'Tags': 'ambulance,bell' }
       });
     } catch(e) {}
   }
 }
 
-// ══ עדכון סטטוס ללקוח (ניסוח יפה) ══
+// ══ עדכון סטטוס ללקוח ══
 async function sendStatusUpdate(order) {
   var msgs = {
-    received: 'קיבלנו את ההזמנה שלך והיא בטיפול! 📥',
-    pending:  'ההזמנה שלך מחכה לתשלום כדי שנוכל להמשיך. ⏳',
-    paid:     'התשלום התקבל בהצלחה! אנחנו ממשיכים בהכנות. 💳',
-    ready:    'חדשות מעולות! ההזמנה שלך מוכנה לאיסוף! ✅',
-    done:     'ההזמנה נמסרה. תתחדש ותהנה! 📦'
+    received: '📥 ההזמנה שלך התקבלה!',
+    pending:  '⏳ ההזמנה ממתינה לתשלום',
+    paid:     '💳 התשלום אושר – תודה!',
+    ready:    '✅ ההזמנה שלך מוכנה לאיסוף!',
+    done:     '📦 ההזמנה נמסרה – תודה!'
   };
-  var statusMsg = msgs[order.status] || 'יש עדכון חדש בהזמנה שלך!';
+  var msg = msgs[order.status]; if (!msg) return;
   var orgName = D.settings.orgname || 'מד"א לכיש';
+  var itemsList = order.items.map(it => '• ' + it.product + ' מידה ' + it.size + ' ×' + it.qty + (it.lineTotal ? ' – ₪' + it.lineTotal : '')).join('\n');
 
+  // ntfy push
+  if (D.settings.ntfy) {
+    try {
+      await fetch('https://ntfy.sh/' + encodeURIComponent(D.settings.ntfy + '-updates'), {
+        method: 'POST',
+        body: msg + ' | הזמנה ' + order.orderNum + ' – ' + order.name,
+        headers: { 'Title': orgName + ' – עדכון הזמנה', 'Tags': 'check', 'Priority': 'default' }
+      });
+    } catch(e) {}
+  }
+
+  // מייל עדכון ללקוח דרך EmailJS
   if (order.email) {
     try {
       await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
         to_email:       order.email,
         to_name:        order.name,
         order_num:      order.orderNum,
-        message:        'היי ' + order.name + ',\n\nרצינו לעדכן לגבי הזמנה מס\' ' + order.orderNum + ':\n\n' + statusMsg + '\n\nנתראה בקרוב,\nצוות ' + orgName
+        customer_name:  order.name,
+        customer_phone: order.phone,
+        customer_email: order.email,
+        items:          itemsList,
+        total:          '₪' + order.total,
+        notes:          order.notes || '—',
+        date:           order.date + ' ' + (order.time || ''),
+        message:        msg + '\n\nמספר הזמנה: ' + order.orderNum + '\n\n' + itemsList + '\n\nסה"כ: ₪' + order.total + '\n\nתודה מ' + orgName + '! 🚑'
       });
     } catch(e) {}
   }
@@ -1176,7 +1204,7 @@ function wireOrds(container){
       var oid=parseInt(this.dataset.id); var o=D.orders[oid]; if(!o) return;
       var txt=o.name+' ('+o.phone+') | '+o.orderNum+'\n';
       o.items.forEach(it=>{ txt+='• '+it.product+' '+it.size+' ×'+it.qty+(it.lineTotal?' – ₪'+it.lineTotal:'')+'\n'; });
-      txt+='סה"כ: ₪'+o.total+(o.notes?'\n📝 '+o.notes+'');
+      txt+='סה"כ: ₪'+o.total+(o.notes?'\n📝 '+o.notes:'');
       try{navigator.clipboard.writeText(txt).then(()=>showToast('📋 הועתק!'));}catch(e){}
     };
   });
