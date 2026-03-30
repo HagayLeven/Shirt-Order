@@ -1189,7 +1189,7 @@ function renderAdminOrders(){
 }
 async function clearAllOrders(){
   var t=document.getElementById('toast');
-  t.innerHTML='למחוק את כל ההזמנות? <button onclick="window.__doDeleteAll()" style="margin-right:8px;background:#fff;color:var(--red);border:none;border-radius:5px;padding:3px 8px;font-weight:700;cursor:pointer;">כן, מחק</button><button onclick="this.parentElement.classList.remove('show')" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;">ביטול</button>';
+  t.innerHTML='למחוק את כל ההזמנות? <button onclick="window.__doDeleteAll()" style="margin-right:8px;background:#fff;color:var(--red);border:none;border-radius:5px;padding:3px 8px;font-weight:700;cursor:pointer;">כן, מחק</button><button onclick="this.parentElement.classList.remove(show)" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;">ביטול</button>';
   t.className='toast show red';
   window.__doDeleteAll=async function(){ await remove(ref(db,'orders')); t.classList.remove('show'); showToast('🗑 כל ההזמנות נמחקו'); };
   setTimeout(()=>t.classList.remove('show'),5000);
