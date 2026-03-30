@@ -1168,8 +1168,9 @@ function wireOrds(container){
     btn.onclick=async function(){
       var oid=parseInt(this.dataset.id);
       var t=document.getElementById('toast');
-      t.innerHTML='מחק הזמנה? <button onclick="window.__doDelete('+oid+')" style="margin-right:8px;background:#fff;color:var(--red);border:none;border-radius:5px;padding:3px 8px;font-weight:700;cursor:pointer;">כן</button><button onclick="this.parentElement.classList.remove('show')" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;">לא</button>';
-      t.className='toast show red';
+t.innerHTML = `מחק הזמנה? 
+  <button onclick="window.__doDelete(${oid})" style="margin-right:8px;background:#fff;color:var(--red);border:none;border-radius:5px;padding:3px 8px;font-weight:700;cursor:pointer;">כן</button>
+  <button onclick="this.parentElement.classList.remove('show')" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;">לא</button>`;      t.className='toast show red';
       window.__doDelete=async function(id){ await deleteOrderFB(id); t.classList.remove('show'); showToast('🗑 נמחק'); };
       setTimeout(()=>t.classList.remove('show'),5000);
     };
