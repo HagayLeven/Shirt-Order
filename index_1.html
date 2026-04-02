@@ -1227,7 +1227,7 @@ function copySummary(){
   var orders=Object.values(D.orders);
   var byP={}; orders.forEach(o=>o.items.forEach(it=>{ var k=it.product+(it.color?' · '+it.color:''); if(!byP[k])byP[k]={}; byP[k][it.size]=(byP[k][it.size]||0)+it.qty; }));
   var txt=(D.settings.orgname||'מד"א לכיש')+' – הזמנה\nתאריך: '+new Date().toLocaleDateString('he-IL')+' | סה"כ: '+orders.length+'\n\n== לפי פריט ומידה ==\n';
-  Object.entries(byP).forEach(([p,sizes])=>{ txt+='\n'+p+':\n'; Object.entries(sizes).forEach(([s,q])=>txt+='  '+s+': '+q+' יח\'\n'); txt+='  סה"כ: '+Object.values(sizes).reduce((a,b)=>a+b,0)+'\n'; });
+  Object.entries(byP).forEach(([p,sizes])=>{ txt+='\n'+p+':\n'; Object.entries(sizes).forEach(([s,q])=>txt+='  '+s+': '+q+' יח\n'); txt+='  סה"כ: '+Object.values(sizes).reduce((a,b)=>a+b,0)+'\n'; });
   txt+='\n== מזמינים ==\n';
   orders.forEach((o,i)=>{ txt+=(i+1)+'. '+o.name+(o.phone?' ('+o.phone+')':'')+(o.email?' ['+o.email+']':'')+' | '+o.orderNum+'\n'; o.items.forEach(it=>txt+='   • '+it.product+' '+it.size+' ×'+it.qty+(it.lineTotal?' ₪'+it.lineTotal:'')+'\n'); if(o.notes)txt+='   📝 '+o.notes+'\n'; });
   txt+='\nסה"כ: ₪'+orders.reduce((s,o)=>s+(o.total||0),0);
