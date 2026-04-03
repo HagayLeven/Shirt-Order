@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://*.googleapis.com https://ntfy.sh https://api.emailjs.com; img-src 'self' data: https: blob:; frame-ancestors 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://ntfy.sh https://api.emailjs.com; img-src 'self' data: https: blob:; frame-ancestors 'none';">
 <meta name="referrer" content="no-referrer">
 <title>מערכת הזמנת חולצות</title>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
@@ -357,9 +357,10 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
   <div class="login-card">
     <div class="lico">🔐</div>
     <h2>כניסת מנהל</h2>
-    <p>הכנס את סיסמת הגישה</p>
-    <input type="password" class="inp-base" id="pwd-inp" placeholder="••••••"/>
-    <div class="login-err" id="login-err">❌ סיסמה שגויה</div>
+    <p>הכנס את פרטי הכניסה שלך</p>
+    <input type="email" class="inp-base" id="admin-email" placeholder="your@gmail.com" autocomplete="email"/>
+    <input type="password" class="inp-base" id="pwd-inp" placeholder="סיסמה" autocomplete="current-password"/>
+    <div class="login-err" id="login-err">❌ אימייל או סיסמה שגויים</div>
     <button class="btn btn-red" style="width:100%;justify-content:center;margin-bottom:10px;" id="do-login">כנס למערכת ←</button>
     <button class="btn btn-gray" style="width:100%;justify-content:center;" id="login-back">← חזרה</button>
   </div>
@@ -602,8 +603,8 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
           <input type="text" class="set-inp" id="s-orgname" placeholder='מד"א לכיש' maxlength="60"/>
         </div>
         <div class="set-row">
-          <div><div class="set-lbl">🔑 שנה סיסמת מנהל</div><div class="set-sub">ברירת מחדל: mda2024</div></div>
-          <input type="password" class="set-inp" id="s-pwd" placeholder="סיסמה חדשה"/>
+          <div><div class="set-lbl">🔑 סיסמת מנהל</div><div class="set-sub">מנוהלת דרך Firebase Authentication</div></div>
+          <span style="font-size:12px;color:var(--muted);">שנה ב-Firebase Console</span>
         </div>
         <div style="margin-top:16px;"><button class="btn btn-red" id="save-settings-btn">💾 שמור הגדרות</button></div>
       </div>
@@ -637,6 +638,7 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, push, onValue, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCnBhJs_I7OtRoWA4keV2wUpitD3hdFWk8",
@@ -650,6 +652,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const auth = getAuth(app);
 
 // ══ STATE ══
 var D = {
@@ -787,7 +790,12 @@ async function saveProducts() {
   var obj = {};
   D.products.forEach(function(p){ obj[p.id]=p; });
   await set(ref(db,'products'), obj);
-  console.log('Products saved:', Object.keys(obj).length);
+}
+async function saveOneProduct(p) {
+  await set(ref(db,'products/'+p.id), p);
+}
+async function deleteOneProduct(id) {
+  await remove(ref(db,'products/'+id));
 }
 async function saveCats() {
   await set(ref(db,'cats'), D.cats);
@@ -826,6 +834,7 @@ window.addEventListener('DOMContentLoaded', function() {
   document.getElementById('h-admin').onclick=()=>{show('pg-login');document.getElementById('pwd-inp').value='';document.getElementById('login-err').style.display='none';};
   document.getElementById('do-login').onclick=doLogin;
   document.getElementById('pwd-inp').onkeydown=(e)=>{if(e.key==='Enter')doLogin();};
+  document.getElementById('admin-email').onkeydown=(e)=>{if(e.key==='Enter')document.getElementById('pwd-inp').focus();};
   document.getElementById('login-back').onclick=()=>show('pg-home');
   document.querySelectorAll('#pg-customer .tab').forEach(btn=>{btn.onclick=function(){switchTab('customer',this.dataset.tab);};});
   document.getElementById('c-home-btn').onclick=()=>show('pg-home');
@@ -841,7 +850,7 @@ window.addEventListener('DOMContentLoaded', function() {
   document.getElementById('new-ord-btn').onclick=()=>{show('pg-customer');switchTab('customer','ct-shop');};
   document.getElementById('conf-home-btn').onclick=()=>show('pg-home');
   document.querySelectorAll('#pg-admin .tab').forEach(btn=>{btn.onclick=function(){switchTab('admin',this.dataset.tab);};});
-  document.getElementById('admin-out-btn').onclick=()=>{D.isAdmin=false;show('pg-home');};
+  document.getElementById('admin-out-btn').onclick=async ()=>{D.isAdmin=false;try{await signOut(auth);}catch(e){}show('pg-home');};
   document.getElementById('status-filter').onchange=renderAdminOrders;
   document.getElementById('a-search').oninput=renderAdminOrders;
   document.getElementById('clear-all-btn').onclick=clearAllOrders;
@@ -866,26 +875,26 @@ async function doLogin() {
     document.getElementById('login-err').textContent = 'נסיונות רבים מדי – נסה שוב עוד ' + sec + ' שניות';
     document.getElementById('login-err').style.display='block'; return;
   }
-  var input = document.getElementById('pwd-inp').value;
-  var stored = D.settings.pwd;
-  var ok = false;
-  if (stored && stored.length === 64) {
-    ok = (await hashPwd(input)) === stored;
-  } else {
-    ok = input === stored; // תמיכה לאחור בסיסמה ישנה (טקסט רגיל)
+  var email = document.getElementById('admin-email').value.trim();
+  var password = document.getElementById('pwd-inp').value;
+  if (!email || !password) {
+    document.getElementById('login-err').textContent = 'נא להזין אימייל וסיסמה';
+    document.getElementById('login-err').style.display='block'; return;
   }
-  if (ok) {
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
     _loginAttempts = 0;
-    // שדרוג אוטומטי מסיסמת טקסט רגיל ל-hash
-    if (!stored || stored.length !== 64) { hashPwd(input).then(h=>{D.settings.pwd=h;saveSettings();}); }
     document.getElementById('login-err').style.display='none';
+    document.getElementById('admin-email').value='';
     document.getElementById('pwd-inp').value='';
     D.isAdmin=true;
     show('pg-admin'); renderDashboard();
-  } else {
+  } catch(e) {
     _loginAttempts++;
     if (_loginAttempts >= 5) { _loginLockUntil = Date.now() + 60000; _loginAttempts = 0; }
-    document.getElementById('login-err').textContent = 'סיסמה שגויה' + (_loginAttempts >= 3 ? ' (' + (5 - _loginAttempts) + ' נסיונות נותרו)' : '');
+    var msg = 'אימייל או סיסמה שגויים';
+    if (_loginAttempts >= 3) msg += ' (' + (5 - _loginAttempts) + ' נסיונות נותרו)';
+    document.getElementById('login-err').textContent = msg;
     document.getElementById('login-err').style.display='block';
   }
 }
@@ -1298,14 +1307,14 @@ function renderManage(){
   if(!D.products.length){grid.innerHTML='';msg.style.display='block';return;}
   msg.style.display='none';
   grid.innerHTML=D.products.map(p=>'<div class="mp-card">'+(p.img?'<img style="width:100%;height:80px;object-fit:contain;border-radius:8px;background:var(--bg);margin-bottom:6px;" src="'+esc(p.img)+'"/>':'<div style="width:100%;height:80px;border-radius:8px;background:var(--warm);display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:6px;">👕</div>')+'<div style="font-size:12px;font-weight:700;margin-bottom:2px;line-height:1.3;">'+esc(p.name)+'</div><div style="font-size:10px;color:var(--muted);margin-bottom:3px;">'+esc(p.cat||'')+(p.color?' · '+esc(p.color):'')+'</div><div class="i-pr"><span>₪</span><input type="number" value="'+(p.price||0)+'" min="0" data-id="'+p.id+'"/></div><div class="mp-acts"><button class="btn-sm edit-p" data-id="'+p.id+'">✏️ ערוך</button><button class="btn-sm del-p" data-id="'+p.id+'">🗑</button></div></div>').join('');
-  grid.querySelectorAll('.i-pr input').forEach(inp=>{inp.onchange=async function(){var p=D.products.find(pr=>pr.id===parseInt(this.dataset.id));if(p){var old=p.price;p.price=parseFloat(this.value)||0;try{await saveProducts();showToast('✅ מחיר עודכן');}catch(e){p.price=old;showToast('⚠️ שגיאה בעדכון מחיר',true);}}};});
+  grid.querySelectorAll('.i-pr input').forEach(inp=>{inp.onchange=async function(){var p=D.products.find(pr=>pr.id===parseInt(this.dataset.id));if(p){var old=p.price;p.price=parseFloat(this.value)||0;try{await update(ref(db,'products/'+p.id),{price:p.price});showToast('✅ מחיר עודכן');}catch(e){p.price=old;showToast('⚠️ שגיאה בעדכון מחיר',true);}}};});
   grid.querySelectorAll('.edit-p').forEach(btn=>{btn.onclick=function(){var p=D.products.find(pr=>pr.id===parseInt(this.dataset.id));if(!p)return;D.editId=p.id;document.getElementById('edit-name').value=p.name;document.getElementById('edit-price').value=p.price||0;document.getElementById('edit-modal').classList.add('open');};});
   grid.querySelectorAll('.del-p').forEach(btn=>{btn.onclick=async function(){
       if(!confirm('למחוק מוצר זה?')) return;
       var id=parseInt(this.dataset.id);
       var backup=[...D.products];
       D.products=D.products.filter(p=>p.id!==id);
-      try{await saveProducts();renderManage();showToast('🗑 נמחק');}
+      try{await deleteOneProduct(id);renderManage();showToast('🗑 נמחק');}
       catch(e){D.products=backup;renderManage();showToast('⚠️ שגיאה במחיקה',true);}
     };});
 }
@@ -1314,21 +1323,24 @@ async function doSaveEdit(){
   var oldName=p.name,oldPrice=p.price;
   p.name=document.getElementById('edit-name').value.trim()||p.name;
   p.price=parseFloat(document.getElementById('edit-price').value)||0;
-  try{await saveProducts();renderManage();document.getElementById('edit-modal').classList.remove('open');showToast('✅ עודכן');}
-  catch(e){p.name=oldName;p.price=oldPrice;showToast('⚠️ שגיאה בעדכון',true);}
+  try{
+    await saveOneProduct(p);
+    renderManage();document.getElementById('edit-modal').classList.remove('open');showToast('✅ עודכן');
+  }catch(e){p.name=oldName;p.price=oldPrice;showToast('⚠️ שגיאה בעדכון',true);}
 }
 async function addProduct(){
   var name=document.getElementById('p-name').value.trim(); if(!name){showToast('⚠️ הכנס שם',true);return;}
   var logos=[]; if(document.getElementById('pl-mda').checked)logos.push('לוגו מד"א'); if(document.getElementById('pl-unit').checked)logos.push('לוגו יחידה'); if(document.getElementById('pl-back').checked)logos.push('שם על גב'); if(document.getElementById('pl-flag').checked)logos.push('דגל ישראל');
   var imgEl=document.getElementById('img-prev');
-  D.products.push({id:Date.now(),name,price:parseFloat(document.getElementById('p-price').value)||0,cat:document.getElementById('p-cat').value,color:document.getElementById('p-color').value.trim(),logos,img:imgEl.style.display!=='none'?imgEl.src:null});
+  var newProd={id:Date.now(),name,price:parseFloat(document.getElementById('p-price').value)||0,cat:document.getElementById('p-cat').value,color:document.getElementById('p-color').value.trim(),logos,img:imgEl.style.display!=='none'?imgEl.src:null};
+  D.products.push(newProd);
   try {
-    await saveProducts();
+    await saveOneProduct(newProd);
     renderManage(); clearPF(); showToast('✅ מוצר נוסף!');
   } catch(e) {
-    console.error('saveProducts error:', e);
-    showToast('❌ שגיאה בשמירה: ' + e.message, true);
-    D.products.pop(); // rollback
+    console.error('addProduct error:', e);
+    D.products.pop();
+    showToast('❌ שגיאה בשמירה: ' + (e.message||e), true);
   }
 }
 function clearPF(){['p-name','p-price','p-color'].forEach(id=>{document.getElementById(id).value='';});['pl-mda','pl-unit','pl-back','pl-flag'].forEach(id=>{document.getElementById(id).checked=false;});document.getElementById('img-prev').style.display='none';document.getElementById('up-hint').style.display='block';}
@@ -1382,7 +1394,7 @@ function renderSettings(){
   document.getElementById('s-email').value=D.settings.email||'';
   document.getElementById('s-ntfy').value=D.settings.ntfy||'';
   document.getElementById('s-orgname').value=D.settings.orgname||'';
-  document.getElementById('s-pwd').value='';
+  // s-pwd הוסר – סיסמה מנוהלת ע"י Firebase Auth
   var orders=Object.values(D.orders);
   document.getElementById('st-ords').textContent=orders.length;
   document.getElementById('st-rev').textContent='₪'+orders.reduce((s,o)=>s+(o.total||0),0);
@@ -1395,8 +1407,6 @@ async function doSaveSettings(){
   D.settings.email=document.getElementById('s-email').value.trim();
   D.settings.ntfy=document.getElementById('s-ntfy').value.trim();
   D.settings.orgname=document.getElementById('s-orgname').value.trim().substring(0,60);
-  var np=document.getElementById('s-pwd').value.trim();
-  if(np) { D.settings.pwd = await hashPwd(np); }
   await saveSettings(); showToast('✅ הגדרות נשמרו!');
 }
 
