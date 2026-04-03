@@ -797,7 +797,9 @@ async function saveProducts() {
   await set(ref(db,'products'), obj);
 }
 async function saveOneProduct(p) {
-  await set(ref(db,'products/'+p.id), p);
+  const fbWrite = set(ref(db,'products/'+p.id), p);
+  const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error('הזמן פג – בדוק הרשאות Firebase או חיבור')),8000));
+  await Promise.race([fbWrite, timeout]);
 }
 async function deleteOneProduct(id) {
   await remove(ref(db,'products/'+id));
