@@ -944,8 +944,8 @@ async function submitOrder() {
   if(miss){var pm=D.products.find(pr=>pr.id===miss.pid);showToast('⚠️ בחר מידה: '+(pm?pm.name:''),true);return;}
   var items=D.cart.map(c=>{ var p=D.products.find(pr=>pr.id===c.pid); return{pid:p.id,product:p.name,color:p.color||'',price:p.price||0,qty:c.qty,size:c.size,extras:[...c.extras],lineTotal:(p.price||0)*c.qty}; });
   var total=items.reduce((s,i)=>s+i.lineTotal,0);
-  var orderCount=Object.keys(D.orders).length+1;
-  var num='MDA-'+String(orderCount).padStart(4,'0');
+  var maxNum=Object.values(D.orders).reduce(function(mx,o){var n=parseInt((o.orderNum||'').replace('MDA-',''))||0;return Math.max(mx,n);},0);
+  var num='MDA-'+String(maxNum+1).padStart(4,'0');
   var orderId=Date.now();
   var now=new Date();
   var order={id:orderId,orderNum:num,name,phone,email,notes:document.getElementById('c-notes').value.trim(),items,total,status:'received',payMethod:'',date:now.toLocaleDateString('he-IL'),time:now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};
@@ -1074,11 +1074,15 @@ async function sendStatusUpdate(order) {
   }
 }
 
-function markPaid(method) {
+async function markPaid(method) {
   var o=D.orders[D.pendingId]; if(!o) return;
-  updateOrder(D.pendingId,{payMethod:method,status:'paid'});
-  document.getElementById('paid-confirm').style.display='block';
-  showToast('✅ '+method+' סומן');
+  try {
+    await updateOrder(D.pendingId,{payMethod:method,status:'paid'});
+    o.payMethod=method; o.status='paid';
+    document.getElementById('paid-confirm').style.display='block';
+    showToast('✅ '+method+' סומן');
+    sendStatusUpdate(o);
+  } catch(e) { showToast('⚠️ שגיאה בעדכון – נסה שוב',true); }
 }
 function resetForm(){D.cart=[];renderProdGrid();updateBadge();updateCostBar();['c-name','c-phone','c-email','c-notes'].forEach(id=>{document.getElementById(id).value='';});}
 
@@ -1164,7 +1168,14 @@ function wireOrds(container){
     };
   });
   container.querySelectorAll('.bit-ok').forEach(btn=>{
-    btn.onclick=async function(){ var oid=parseInt(this.dataset.id); await updateOrder(oid,{status:'paid',payMethod:'אושר ✓'}); showToast('✅ תשלום אושר'); };
+    btn.onclick=async function(){
+      var oid=parseInt(this.dataset.id);
+      try {
+        await updateOrder(oid,{status:'paid',payMethod:'אושר ✓'});
+        var o=D.orders[oid]; if(o){o.status='paid';o.payMethod='אושר ✓';sendStatusUpdate(o);}
+        showToast('✅ תשלום אושר');
+      } catch(e) { showToast('⚠️ שגיאה בעדכון',true); }
+    };
   });
   container.querySelectorAll('.del-ord').forEach(btn=>{
     btn.onclick=async function(){
