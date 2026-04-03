@@ -787,7 +787,12 @@ async function saveProducts() {
   var obj = {};
   D.products.forEach(function(p){ obj[p.id]=p; });
   await set(ref(db,'products'), obj);
-  console.log('Products saved:', Object.keys(obj).length);
+}
+async function saveOneProduct(p) {
+  await set(ref(db,'products/'+p.id), p);
+}
+async function deleteOneProduct(id) {
+  await remove(ref(db,'products/'+id));
 }
 async function saveCats() {
   await set(ref(db,'cats'), D.cats);
@@ -1298,14 +1303,14 @@ function renderManage(){
   if(!D.products.length){grid.innerHTML='';msg.style.display='block';return;}
   msg.style.display='none';
   grid.innerHTML=D.products.map(p=>'<div class="mp-card">'+(p.img?'<img style="width:100%;height:80px;object-fit:contain;border-radius:8px;background:var(--bg);margin-bottom:6px;" src="'+esc(p.img)+'"/>':'<div style="width:100%;height:80px;border-radius:8px;background:var(--warm);display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:6px;">👕</div>')+'<div style="font-size:12px;font-weight:700;margin-bottom:2px;line-height:1.3;">'+esc(p.name)+'</div><div style="font-size:10px;color:var(--muted);margin-bottom:3px;">'+esc(p.cat||'')+(p.color?' · '+esc(p.color):'')+'</div><div class="i-pr"><span>₪</span><input type="number" value="'+(p.price||0)+'" min="0" data-id="'+p.id+'"/></div><div class="mp-acts"><button class="btn-sm edit-p" data-id="'+p.id+'">✏️ ערוך</button><button class="btn-sm del-p" data-id="'+p.id+'">🗑</button></div></div>').join('');
-  grid.querySelectorAll('.i-pr input').forEach(inp=>{inp.onchange=async function(){var p=D.products.find(pr=>pr.id===parseInt(this.dataset.id));if(p){var old=p.price;p.price=parseFloat(this.value)||0;try{await saveProducts();showToast('✅ מחיר עודכן');}catch(e){p.price=old;showToast('⚠️ שגיאה בעדכון מחיר',true);}}};});
+  grid.querySelectorAll('.i-pr input').forEach(inp=>{inp.onchange=async function(){var p=D.products.find(pr=>pr.id===parseInt(this.dataset.id));if(p){var old=p.price;p.price=parseFloat(this.value)||0;try{await update(ref(db,'products/'+p.id),{price:p.price});showToast('✅ מחיר עודכן');}catch(e){p.price=old;showToast('⚠️ שגיאה בעדכון מחיר',true);}}};});
   grid.querySelectorAll('.edit-p').forEach(btn=>{btn.onclick=function(){var p=D.products.find(pr=>pr.id===parseInt(this.dataset.id));if(!p)return;D.editId=p.id;document.getElementById('edit-name').value=p.name;document.getElementById('edit-price').value=p.price||0;document.getElementById('edit-modal').classList.add('open');};});
   grid.querySelectorAll('.del-p').forEach(btn=>{btn.onclick=async function(){
       if(!confirm('למחוק מוצר זה?')) return;
       var id=parseInt(this.dataset.id);
       var backup=[...D.products];
       D.products=D.products.filter(p=>p.id!==id);
-      try{await saveProducts();renderManage();showToast('🗑 נמחק');}
+      try{await deleteOneProduct(id);renderManage();showToast('🗑 נמחק');}
       catch(e){D.products=backup;renderManage();showToast('⚠️ שגיאה במחיקה',true);}
     };});
 }
@@ -1314,21 +1319,24 @@ async function doSaveEdit(){
   var oldName=p.name,oldPrice=p.price;
   p.name=document.getElementById('edit-name').value.trim()||p.name;
   p.price=parseFloat(document.getElementById('edit-price').value)||0;
-  try{await saveProducts();renderManage();document.getElementById('edit-modal').classList.remove('open');showToast('✅ עודכן');}
-  catch(e){p.name=oldName;p.price=oldPrice;showToast('⚠️ שגיאה בעדכון',true);}
+  try{
+    await saveOneProduct(p);
+    renderManage();document.getElementById('edit-modal').classList.remove('open');showToast('✅ עודכן');
+  }catch(e){p.name=oldName;p.price=oldPrice;showToast('⚠️ שגיאה בעדכון',true);}
 }
 async function addProduct(){
   var name=document.getElementById('p-name').value.trim(); if(!name){showToast('⚠️ הכנס שם',true);return;}
   var logos=[]; if(document.getElementById('pl-mda').checked)logos.push('לוגו מד"א'); if(document.getElementById('pl-unit').checked)logos.push('לוגו יחידה'); if(document.getElementById('pl-back').checked)logos.push('שם על גב'); if(document.getElementById('pl-flag').checked)logos.push('דגל ישראל');
   var imgEl=document.getElementById('img-prev');
-  D.products.push({id:Date.now(),name,price:parseFloat(document.getElementById('p-price').value)||0,cat:document.getElementById('p-cat').value,color:document.getElementById('p-color').value.trim(),logos,img:imgEl.style.display!=='none'?imgEl.src:null});
+  var newProd={id:Date.now(),name,price:parseFloat(document.getElementById('p-price').value)||0,cat:document.getElementById('p-cat').value,color:document.getElementById('p-color').value.trim(),logos,img:imgEl.style.display!=='none'?imgEl.src:null};
+  D.products.push(newProd);
   try {
-    await saveProducts();
+    await saveOneProduct(newProd);
     renderManage(); clearPF(); showToast('✅ מוצר נוסף!');
   } catch(e) {
-    console.error('saveProducts error:', e);
-    showToast('❌ שגיאה בשמירה: ' + e.message, true);
-    D.products.pop(); // rollback
+    console.error('addProduct error:', e);
+    D.products.pop();
+    showToast('❌ שגיאה בשמירה: ' + (e.message||e), true);
   }
 }
 function clearPF(){['p-name','p-price','p-color'].forEach(id=>{document.getElementById(id).value='';});['pl-mda','pl-unit','pl-back','pl-flag'].forEach(id=>{document.getElementById(id).checked=false;});document.getElementById('img-prev').style.display='none';document.getElementById('up-hint').style.display='block';}
