@@ -306,6 +306,9 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--txt);direct
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--green);color:#fff;padding:11px 20px;border-radius:11px;font-size:13px;font-weight:700;box-shadow:0 4px 18px rgba(0,0,0,.2);transition:transform .28s ease;z-index:999;white-space:nowrap;max-width:92vw;}
 .toast.show{transform:translateX(-50%) translateY(0);}
 .toast.red{background:var(--red);}
+.form-err{background:#fff0f0;border:1.5px solid var(--red);border-radius:9px;padding:10px 14px;font-size:13px;font-weight:600;color:var(--red);margin-top:10px;display:none;}
+.form-err.show{display:block;}
+input.inp-err{border-color:var(--red)!important;background:#fff8f8!important;}
 
 hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
 
@@ -549,6 +552,7 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
             </div>
           </div>
         </div>
+        <div id="prod-err" class="form-err"></div>
         <div class="f-actions">
           <button class="btn btn-red" id="add-prod-btn">שמור מוצר</button>
           <button class="btn btn-gray" id="clear-pf-btn">נקה</button>
@@ -625,6 +629,7 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
     <h2>✏️ עריכת מוצר</h2>
     <div class="ff" style="margin-bottom:13px;"><label>שם מוצר</label><input type="text" id="edit-name" maxlength="80" style="font-family:'Heebo',sans-serif;font-size:14px;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;background:var(--bg);color:var(--txt);width:100%;"/></div>
     <div class="ff"><label>מחיר (₪)</label><input type="number" id="edit-price" min="0" style="font-family:'Heebo',sans-serif;font-size:14px;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;background:var(--bg);color:var(--txt);width:100%;"/></div>
+    <div id="edit-err" class="form-err"></div>
     <div class="modal-acts">
       <button class="btn btn-red" id="save-edit-btn">שמור</button>
       <button class="btn btn-gray" id="close-modal-btn">ביטול</button>
@@ -859,6 +864,7 @@ window.addEventListener('DOMContentLoaded', function() {
   document.getElementById('add-cat-btn').onclick=addCat;
   document.getElementById('add-prod-btn').onclick=addProduct;
   document.getElementById('clear-pf-btn').onclick=clearPF;
+  document.getElementById('p-name').oninput=function(){this.classList.remove('inp-err');var e=document.getElementById('prod-err');if(e)e.classList.remove('show');};
   document.getElementById('save-settings-btn').onclick=doSaveSettings;
   document.getElementById('save-edit-btn').onclick=doSaveEdit;
   document.getElementById('close-modal-btn').onclick=()=>document.getElementById('edit-modal').classList.remove('open');
@@ -1343,31 +1349,63 @@ function renderManage(){
     };});
 }
 async function doSaveEdit(){
+  console.log('doSaveEdit called');
+  var errEl=document.getElementById('edit-err');
+  errEl.classList.remove('show');
   var p=D.products.find(pr=>pr.id===D.editId);if(!p)return;
   var oldName=p.name,oldPrice=p.price;
   p.name=document.getElementById('edit-name').value.trim()||p.name;
   p.price=parseFloat(document.getElementById('edit-price').value)||0;
+  var btn=document.getElementById('save-edit-btn');
+  btn.disabled=true; btn.textContent='שומר...';
   try{
     await saveOneProduct(p);
+    btn.disabled=false; btn.textContent='שמור';
     renderManage();document.getElementById('edit-modal').classList.remove('open');showToast('✅ עודכן');
-  }catch(e){p.name=oldName;p.price=oldPrice;showToast('⚠️ שגיאה בעדכון',true);}
+  }catch(e){
+    console.error('doSaveEdit error:', e);
+    p.name=oldName;p.price=oldPrice;
+    btn.disabled=false; btn.textContent='שמור';
+    errEl.textContent='❌ שגיאה בעדכון: ' + (e.message||e);
+    errEl.classList.add('show');
+    showToast('⚠️ שגיאה בעדכון',true);
+  }
 }
 async function addProduct(){
-  var name=document.getElementById('p-name').value.trim(); if(!name){showToast('⚠️ הכנס שם',true);return;}
+  console.log('addProduct called');
+  var errEl=document.getElementById('prod-err');
+  errEl.classList.remove('show');
+  var nameInp=document.getElementById('p-name');
+  var name=nameInp.value.trim();
+  if(!name){
+    nameInp.classList.add('inp-err');
+    errEl.textContent='⚠️ חובה להכניס שם מוצר';
+    errEl.classList.add('show');
+    nameInp.focus();
+    return;
+  }
+  nameInp.classList.remove('inp-err');
   var logos=[]; if(document.getElementById('pl-mda').checked)logos.push('לוגו מד"א'); if(document.getElementById('pl-unit').checked)logos.push('לוגו יחידה'); if(document.getElementById('pl-back').checked)logos.push('שם על גב'); if(document.getElementById('pl-flag').checked)logos.push('דגל ישראל');
   var imgEl=document.getElementById('img-prev');
   var newProd={id:Date.now(),name,price:parseFloat(document.getElementById('p-price').value)||0,cat:document.getElementById('p-cat').value,color:document.getElementById('p-color').value.trim(),logos,img:imgEl.style.display!=='none'?imgEl.src:null};
   D.products.push(newProd);
+  var btn=document.getElementById('add-prod-btn');
+  btn.disabled=true; btn.textContent='שומר...';
   try {
     await saveOneProduct(newProd);
+    btn.disabled=false; btn.textContent='שמור מוצר';
+    errEl.classList.remove('show');
     renderManage(); clearPF(); showToast('✅ מוצר נוסף!');
   } catch(e) {
     console.error('addProduct error:', e);
     D.products.pop();
-    showToast('❌ שגיאה בשמירה: ' + (e.message||e), true);
+    btn.disabled=false; btn.textContent='שמור מוצר';
+    errEl.textContent='❌ שגיאה בשמירה: ' + (e.message||e);
+    errEl.classList.add('show');
+    showToast('❌ שגיאה בשמירה', true);
   }
 }
-function clearPF(){['p-name','p-price','p-color'].forEach(id=>{document.getElementById(id).value='';});['pl-mda','pl-unit','pl-back','pl-flag'].forEach(id=>{document.getElementById(id).checked=false;});document.getElementById('img-prev').style.display='none';document.getElementById('up-hint').style.display='block';}
+function clearPF(){['p-name','p-price','p-color'].forEach(id=>{document.getElementById(id).value='';document.getElementById(id).classList.remove('inp-err');});['pl-mda','pl-unit','pl-back','pl-flag'].forEach(id=>{document.getElementById(id).checked=false;});document.getElementById('img-prev').style.display='none';document.getElementById('up-hint').style.display='block';var e=document.getElementById('prod-err');if(e)e.classList.remove('show');}
 function prevImg(input){
   if(!input.files||!input.files[0])return;
   var file=input.files[0];
