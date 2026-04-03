@@ -876,6 +876,8 @@ async function doLogin() {
   }
   if (ok) {
     _loginAttempts = 0;
+    // שדרוג אוטומטי מסיסמת טקסט רגיל ל-hash
+    if (!stored || stored.length !== 64) { hashPwd(input).then(h=>{D.settings.pwd=h;saveSettings();}); }
     document.getElementById('login-err').style.display='none';
     document.getElementById('pwd-inp').value='';
     D.isAdmin=true;
@@ -892,7 +894,7 @@ async function doLogin() {
 function renderCatsBar() {
   var bar=document.getElementById('shop-cats');
   var html='<button class="cat-pill'+(D.activeCat==='all'?' on':'')+'" data-cat="all">הכל</button>';
-  D.cats.forEach(c=>{ html+='<button class="cat-pill'+(D.activeCat===c?' on':'')+'" data-cat="'+c+'">'+c+'</button>'; });
+  D.cats.forEach(c=>{ html+='<button class="cat-pill'+(D.activeCat===c?' on':'')+'" data-cat="'+esc(c)+'">'+esc(c)+'</button>'; });
   bar.innerHTML=html;
   bar.querySelectorAll('.cat-pill').forEach(btn=>{
     btn.onclick=function(){ D.activeCat=this.dataset.cat; bar.querySelectorAll('.cat-pill').forEach(b=>b.classList.remove('on')); this.classList.add('on'); renderProdGrid(); };
@@ -1296,16 +1298,25 @@ function renderManage(){
   if(!D.products.length){grid.innerHTML='';msg.style.display='block';return;}
   msg.style.display='none';
   grid.innerHTML=D.products.map(p=>'<div class="mp-card">'+(p.img?'<img style="width:100%;height:80px;object-fit:contain;border-radius:8px;background:var(--bg);margin-bottom:6px;" src="'+esc(p.img)+'"/>':'<div style="width:100%;height:80px;border-radius:8px;background:var(--warm);display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:6px;">👕</div>')+'<div style="font-size:12px;font-weight:700;margin-bottom:2px;line-height:1.3;">'+esc(p.name)+'</div><div style="font-size:10px;color:var(--muted);margin-bottom:3px;">'+esc(p.cat||'')+(p.color?' · '+esc(p.color):'')+'</div><div class="i-pr"><span>₪</span><input type="number" value="'+(p.price||0)+'" min="0" data-id="'+p.id+'"/></div><div class="mp-acts"><button class="btn-sm edit-p" data-id="'+p.id+'">✏️ ערוך</button><button class="btn-sm del-p" data-id="'+p.id+'">🗑</button></div></div>').join('');
-  grid.querySelectorAll('.i-pr input').forEach(inp=>{inp.onchange=async function(){var p=D.products.find(pr=>pr.id===parseInt(this.dataset.id));if(p){p.price=parseFloat(this.value)||0;await saveProducts();showToast('✅ מחיר עודכן');}};});
+  grid.querySelectorAll('.i-pr input').forEach(inp=>{inp.onchange=async function(){var p=D.products.find(pr=>pr.id===parseInt(this.dataset.id));if(p){var old=p.price;p.price=parseFloat(this.value)||0;try{await saveProducts();showToast('✅ מחיר עודכן');}catch(e){p.price=old;showToast('⚠️ שגיאה בעדכון מחיר',true);}}};});
   grid.querySelectorAll('.edit-p').forEach(btn=>{btn.onclick=function(){var p=D.products.find(pr=>pr.id===parseInt(this.dataset.id));if(!p)return;D.editId=p.id;document.getElementById('edit-name').value=p.name;document.getElementById('edit-price').value=p.price||0;document.getElementById('edit-modal').classList.add('open');};});
   grid.querySelectorAll('.del-p').forEach(btn=>{btn.onclick=async function(){
       if(!confirm('למחוק מוצר זה?')) return;
       var id=parseInt(this.dataset.id);
+      var backup=[...D.products];
       D.products=D.products.filter(p=>p.id!==id);
-      await saveProducts(); renderManage(); showToast('🗑 נמחק');
+      try{await saveProducts();renderManage();showToast('🗑 נמחק');}
+      catch(e){D.products=backup;renderManage();showToast('⚠️ שגיאה במחיקה',true);}
     };});
 }
-async function doSaveEdit(){var p=D.products.find(pr=>pr.id===D.editId);if(!p)return;p.name=document.getElementById('edit-name').value.trim()||p.name;p.price=parseFloat(document.getElementById('edit-price').value)||0;await saveProducts();renderManage();document.getElementById('edit-modal').classList.remove('open');showToast('✅ עודכן');}
+async function doSaveEdit(){
+  var p=D.products.find(pr=>pr.id===D.editId);if(!p)return;
+  var oldName=p.name,oldPrice=p.price;
+  p.name=document.getElementById('edit-name').value.trim()||p.name;
+  p.price=parseFloat(document.getElementById('edit-price').value)||0;
+  try{await saveProducts();renderManage();document.getElementById('edit-modal').classList.remove('open');showToast('✅ עודכן');}
+  catch(e){p.name=oldName;p.price=oldPrice;showToast('⚠️ שגיאה בעדכון',true);}
+}
 async function addProduct(){
   var name=document.getElementById('p-name').value.trim(); if(!name){showToast('⚠️ הכנס שם',true);return;}
   var logos=[]; if(document.getElementById('pl-mda').checked)logos.push('לוגו מד"א'); if(document.getElementById('pl-unit').checked)logos.push('לוגו יחידה'); if(document.getElementById('pl-back').checked)logos.push('שם על גב'); if(document.getElementById('pl-flag').checked)logos.push('דגל ישראל');
@@ -1321,7 +1332,27 @@ async function addProduct(){
   }
 }
 function clearPF(){['p-name','p-price','p-color'].forEach(id=>{document.getElementById(id).value='';});['pl-mda','pl-unit','pl-back','pl-flag'].forEach(id=>{document.getElementById(id).checked=false;});document.getElementById('img-prev').style.display='none';document.getElementById('up-hint').style.display='block';}
-function prevImg(input){if(!input.files||!input.files[0])return;var r=new FileReader();r.onload=e=>{var img=document.getElementById('img-prev');img.src=e.target.result;img.style.display='block';document.getElementById('up-hint').style.display='none';};r.readAsDataURL(input.files[0]);}
+function prevImg(input){
+  if(!input.files||!input.files[0])return;
+  var file=input.files[0];
+  if(file.size>8*1024*1024){showToast('⚠️ תמונה גדולה מדי – מקס׳ 8MB',true);input.value='';return;}
+  var r=new FileReader();
+  r.onload=function(e){
+    var orig=new Image();
+    orig.onload=function(){
+      var MAX=600,w=orig.width,h=orig.height;
+      if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+      var cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      cv.getContext('2d').drawImage(orig,0,0,w,h);
+      var compressed=cv.toDataURL('image/jpeg',0.72);
+      var img=document.getElementById('img-prev');
+      img.src=compressed;img.style.display='block';
+      document.getElementById('up-hint').style.display='none';
+    };
+    orig.src=e.target.result;
+  };
+  r.readAsDataURL(file);
+}
 
 // ══ CATEGORIES ══
 function renderCatList(){
@@ -1335,8 +1366,14 @@ function renderCatList(){
     };});
   fillCatSel();
 }
-async function addCat(){var n=document.getElementById('new-cat-inp').value.trim();if(!n||D.cats.includes(n)){showToast('⚠️ שם קיים/ריק',true);return;}D.cats.push(n);await saveCats();renderCatList();renderCatsBar();document.getElementById('new-cat-inp').value='';showToast('✅ נוסף');}
-function fillCatSel(){var s=document.getElementById('p-cat');if(s)s.innerHTML=D.cats.map(c=>'<option value="'+c+'">'+c+'</option>').join('');}
+async function addCat(){
+  var n=document.getElementById('new-cat-inp').value.trim();
+  if(!n||D.cats.includes(n)){showToast('⚠️ שם קיים/ריק',true);return;}
+  D.cats.push(n);
+  try{await saveCats();renderCatList();renderCatsBar();document.getElementById('new-cat-inp').value='';showToast('✅ נוסף');}
+  catch(e){D.cats.pop();showToast('⚠️ שגיאה בשמירה',true);}
+}
+function fillCatSel(){var s=document.getElementById('p-cat');if(s)s.innerHTML=D.cats.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('');}
 
 // ══ SETTINGS ══
 function renderSettings(){
