@@ -832,46 +832,44 @@ function switchTab(ctx,tabId) {
   if(tabId==='at-settings') renderSettings();
 }
 
-// ══ WIRE BUTTONS ══
-window.addEventListener('DOMContentLoaded', function() {
-  document.getElementById('h-shop').onclick=()=>{show('pg-customer');renderCatsBar();renderProdGrid();updateBadge();};
-  document.getElementById('h-track').onclick=()=>{show('pg-customer');renderCatsBar();renderProdGrid();updateBadge();switchTab('customer','ct-myorders');};
-  document.getElementById('h-admin').onclick=()=>{show('pg-login');document.getElementById('pwd-inp').value='';document.getElementById('login-err').style.display='none';};
-  document.getElementById('do-login').onclick=doLogin;
-  document.getElementById('pwd-inp').onkeydown=(e)=>{if(e.key==='Enter')doLogin();};
-  document.getElementById('admin-email').onkeydown=(e)=>{if(e.key==='Enter')document.getElementById('pwd-inp').focus();};
-  document.getElementById('login-back').onclick=()=>show('pg-home');
-  document.querySelectorAll('#pg-customer .tab').forEach(btn=>{btn.onclick=function(){switchTab('customer',this.dataset.tab);};});
-  document.getElementById('c-home-btn').onclick=()=>show('pg-home');
-  document.getElementById('clear-cart-btn').onclick=clearCart;
-  document.getElementById('submit-order-btn').onclick=submitOrder;
-  document.getElementById('reset-form-btn').onclick=resetForm;
-  document.getElementById('my-search').oninput=renderMyOrders;
-  document.getElementById('bit-link').onclick=()=>markPaid('ביט');
-  document.getElementById('paybox-link').onclick=()=>markPaid('PayBox');
-  document.getElementById('pay-bank').onclick=()=>markPaid('העברה בנקאית');
-  document.getElementById('pay-cash-btn').onclick=()=>markPaid('מזומן');
-  document.getElementById('to-confirm-btn').onclick=()=>{show('pg-confirm');renderConfirm();};
-  document.getElementById('new-ord-btn').onclick=()=>{show('pg-customer');switchTab('customer','ct-shop');};
-  document.getElementById('conf-home-btn').onclick=()=>show('pg-home');
-  document.querySelectorAll('#pg-admin .tab').forEach(btn=>{btn.onclick=function(){switchTab('admin',this.dataset.tab);};});
-  document.getElementById('admin-out-btn').onclick=async ()=>{D.isAdmin=false;try{await signOut(auth);}catch(e){}show('pg-home');};
-  document.getElementById('status-filter').onchange=renderAdminOrders;
-  document.getElementById('a-search').oninput=renderAdminOrders;
-  document.getElementById('clear-all-btn').onclick=clearAllOrders;
-  document.getElementById('copy-sum-btn').onclick=copySummary;
-  document.getElementById('export-csv-btn').onclick=exportCSV;
-  document.getElementById('add-cat-btn').onclick=addCat;
-  document.getElementById('add-prod-btn').onclick=addProduct;
-  document.getElementById('clear-pf-btn').onclick=clearPF;
-  document.getElementById('p-name').oninput=function(){this.classList.remove('inp-err');var e=document.getElementById('prod-err');if(e)e.classList.remove('show');};
-  document.getElementById('save-settings-btn').onclick=doSaveSettings;
-  document.getElementById('save-edit-btn').onclick=doSaveEdit;
-  document.getElementById('close-modal-btn').onclick=()=>document.getElementById('edit-modal').classList.remove('open');
-  document.getElementById('p-img-inp').onchange=function(){prevImg(this);};
-  renderCatsBar(); renderProdGrid(); updateBadge();
-  initFirebase();
-});
+// ══ WIRE BUTTONS (מודולים הם defer – DOM מוכן בעת הרצה) ══
+document.getElementById('h-shop').onclick=()=>{show('pg-customer');renderCatsBar();renderProdGrid();updateBadge();};
+document.getElementById('h-track').onclick=()=>{show('pg-customer');renderCatsBar();renderProdGrid();updateBadge();switchTab('customer','ct-myorders');};
+document.getElementById('h-admin').onclick=()=>{show('pg-login');document.getElementById('pwd-inp').value='';document.getElementById('login-err').style.display='none';};
+document.getElementById('do-login').onclick=doLogin;
+document.getElementById('pwd-inp').onkeydown=(e)=>{if(e.key==='Enter')doLogin();};
+document.getElementById('admin-email').onkeydown=(e)=>{if(e.key==='Enter')document.getElementById('pwd-inp').focus();};
+document.getElementById('login-back').onclick=()=>show('pg-home');
+document.querySelectorAll('#pg-customer .tab').forEach(btn=>{btn.onclick=function(){switchTab('customer',this.dataset.tab);};});
+document.getElementById('c-home-btn').onclick=()=>show('pg-home');
+document.getElementById('clear-cart-btn').onclick=clearCart;
+document.getElementById('submit-order-btn').onclick=submitOrder;
+document.getElementById('reset-form-btn').onclick=resetForm;
+document.getElementById('my-search').oninput=renderMyOrders;
+document.getElementById('bit-link').onclick=()=>markPaid('ביט');
+document.getElementById('paybox-link').onclick=()=>markPaid('PayBox');
+document.getElementById('pay-bank').onclick=()=>markPaid('העברה בנקאית');
+document.getElementById('pay-cash-btn').onclick=()=>markPaid('מזומן');
+document.getElementById('to-confirm-btn').onclick=()=>{show('pg-confirm');renderConfirm();};
+document.getElementById('new-ord-btn').onclick=()=>{show('pg-customer');switchTab('customer','ct-shop');};
+document.getElementById('conf-home-btn').onclick=()=>show('pg-home');
+document.querySelectorAll('#pg-admin .tab').forEach(btn=>{btn.onclick=function(){switchTab('admin',this.dataset.tab);};});
+document.getElementById('admin-out-btn').onclick=async ()=>{D.isAdmin=false;try{await signOut(auth);}catch(e){}show('pg-home');};
+document.getElementById('status-filter').onchange=renderAdminOrders;
+document.getElementById('a-search').oninput=renderAdminOrders;
+document.getElementById('clear-all-btn').onclick=clearAllOrders;
+document.getElementById('copy-sum-btn').onclick=copySummary;
+document.getElementById('export-csv-btn').onclick=exportCSV;
+document.getElementById('add-cat-btn').onclick=addCat;
+document.getElementById('add-prod-btn').onclick=addProduct;
+document.getElementById('clear-pf-btn').onclick=clearPF;
+document.getElementById('p-name').oninput=function(){this.classList.remove('inp-err');var e=document.getElementById('prod-err');if(e)e.classList.remove('show');};
+document.getElementById('save-settings-btn').onclick=doSaveSettings;
+document.getElementById('save-edit-btn').onclick=doSaveEdit;
+document.getElementById('close-modal-btn').onclick=()=>document.getElementById('edit-modal').classList.remove('open');
+document.getElementById('p-img-inp').onchange=function(){prevImg(this);};
+renderCatsBar(); renderProdGrid(); updateBadge();
+initFirebase();
 
 // ══ LOGIN ══
 async function doLogin() {
