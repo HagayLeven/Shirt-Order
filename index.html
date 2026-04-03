@@ -358,7 +358,7 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
     <div class="lico">🔐</div>
     <h2>כניסת מנהל</h2>
     <p>הכנס את פרטי הכניסה שלך</p>
-    <input type="email" class="inp-base" id="admin-email" placeholder="your@gmail.com" autocomplete="email"/>
+    <input type="email" class="inp-base" id="admin-email" placeholder="Gmail (אופציונלי)" autocomplete="email"/>
     <input type="password" class="inp-base" id="pwd-inp" placeholder="סיסמה" autocomplete="current-password"/>
     <div class="login-err" id="login-err">❌ אימייל או סיסמה שגויים</div>
     <button class="btn btn-red" style="width:100%;justify-content:center;margin-bottom:10px;" id="do-login">כנס למערכת ←</button>
@@ -638,7 +638,7 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, push, onValue, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCnBhJs_I7OtRoWA4keV2wUpitD3hdFWk8",
@@ -877,19 +877,43 @@ async function doLogin() {
   }
   var email = document.getElementById('admin-email').value.trim();
   var password = document.getElementById('pwd-inp').value;
-  if (!email || !password) {
-    document.getElementById('login-err').textContent = 'נא להזין אימייל וסיסמה';
+  if (!password) {
+    document.getElementById('login-err').textContent = 'נא להזין סיסמה';
     document.getElementById('login-err').style.display='block'; return;
   }
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
+
+  var ok = false;
+
+  // נסיון 1: Firebase Auth (אם הוגדר ויש אימייל)
+  if (email) {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      ok = true;
+    } catch(e) { /* נכשל – ינסה סיסמה מקומית */ }
+  }
+
+  // נסיון 2: סיסמה מקומית (fallback)
+  if (!ok) {
+    var stored = D.settings.pwd || '';
+    if (stored.length === 64) {
+      ok = (await hashPwd(password)) === stored;
+    } else {
+      ok = password === stored;
+    }
+    if (ok) {
+      // כניסה anonymous כדי לספק auth != null לחוקי Firebase
+      try { await signInAnonymously(auth); } catch(e) {}
+    }
+  }
+
+  if (ok) {
     _loginAttempts = 0;
     document.getElementById('login-err').style.display='none';
     document.getElementById('admin-email').value='';
     document.getElementById('pwd-inp').value='';
     D.isAdmin=true;
     show('pg-admin'); renderDashboard();
-  } catch(e) {
+  } else {
     _loginAttempts++;
     if (_loginAttempts >= 5) { _loginLockUntil = Date.now() + 60000; _loginAttempts = 0; }
     var msg = 'אימייל או סיסמה שגויים';
