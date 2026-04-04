@@ -783,12 +783,8 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
             <div class="img-up"><input type="file" accept="image/*" id="p-img-inp"/><div id="up-hint"><p>📷 לחץ להעלאה</p></div><img id="img-prev" class="img-sm" style="display:none;"/></div>
           </div>
           <div class="ff"><label>תוספות ברירת מחדל</label>
-            <div style="display:flex;flex-direction:column;gap:5px;margin-top:3px;">
-              <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:400;"><input type="checkbox" id="pl-mda" style="width:auto;padding:0;border:none;background:none;"> לוגו מד"א</label>
-              <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:400;"><input type="checkbox" id="pl-unit" style="width:auto;padding:0;border:none;background:none;"> לוגו יחידה</label>
-              <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:400;"><input type="checkbox" id="pl-back" style="width:auto;padding:0;border:none;background:none;"> שם על גב</label>
-              <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:400;"><input type="checkbox" id="pl-flag" style="width:auto;padding:0;border:none;background:none;"> דגל ישראל</label>
-            </div>
+            <div id="prod-extras-checks" style="display:flex;flex-direction:column;gap:5px;margin-top:3px;"></div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">לניהול התוספות ← הגדרות ← גלופות</div>
           </div>
         </div>
         <div id="prod-err" class="form-err"></div>
@@ -1081,7 +1077,7 @@ function switchTab(ctx,tabId) {
   if(tabId==='ct-cart') renderCart();
   if(tabId==='at-orders') renderAdminOrders();
   if(tabId==='at-summary') renderSummary();
-  if(tabId==='at-products'){renderManage();renderCatList();fillCatSel();}
+  if(tabId==='at-products'){renderManage();renderCatList();fillCatSel();renderProdExtrasCheckboxes();}
   if(tabId==='at-dash') renderDashboard();
   if(tabId==='at-settings') renderSettings();
 }
@@ -1645,7 +1641,7 @@ async function addProduct(){
     return;
   }
   nameInp.classList.remove('inp-err');
-  var logos=[]; if(document.getElementById('pl-mda').checked)logos.push('לוגו מד"א'); if(document.getElementById('pl-unit').checked)logos.push('לוגו יחידה'); if(document.getElementById('pl-back').checked)logos.push('שם על גב'); if(document.getElementById('pl-flag').checked)logos.push('דגל ישראל');
+  var logos=[]; document.querySelectorAll('#prod-extras-checks input[type=checkbox]:checked').forEach(cb=>logos.push(cb.value));
   var imgEl=document.getElementById('img-prev');
   var newProd={id:Date.now(),name,price:parseFloat(document.getElementById('p-price').value)||0,cat:document.getElementById('p-cat').value,color:document.getElementById('p-color').value.trim(),logos,img:imgEl.style.display!=='none'?imgEl.src:null};
   D.products.push(newProd);
@@ -1665,7 +1661,7 @@ async function addProduct(){
     showToast('❌ שגיאה בשמירה', true);
   }
 }
-function clearPF(){['p-name','p-price','p-color'].forEach(id=>{document.getElementById(id).value='';document.getElementById(id).classList.remove('inp-err');});['pl-mda','pl-unit','pl-back','pl-flag'].forEach(id=>{document.getElementById(id).checked=false;});document.getElementById('img-prev').style.display='none';document.getElementById('up-hint').style.display='block';var e=document.getElementById('prod-err');if(e)e.classList.remove('show');}
+function clearPF(){['p-name','p-price','p-color'].forEach(id=>{document.getElementById(id).value='';document.getElementById(id).classList.remove('inp-err');});document.querySelectorAll('#prod-extras-checks input[type=checkbox]').forEach(cb=>{cb.checked=false;});document.getElementById('img-prev').style.display='none';document.getElementById('up-hint').style.display='block';var e=document.getElementById('prod-err');if(e)e.classList.remove('show');}
 function prevImg(input){
   if(!input.files||!input.files[0])return;
   var file=input.files[0];
@@ -1713,9 +1709,24 @@ function renderExtrasList(){
   var el=document.getElementById('extras-admin-list');
   if(!el)return;
   var exs=D.settings.extras||[];
-  if(!exs.length){el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px 0;">אין תוספות – הוסף למטה</div>';return;}
-  el.innerHTML=exs.map((ex,i)=>'<div class="extra-row"><div class="extra-row-name">'+esc(ex.name)+'</div><div class="extra-row-price">'+(ex.price>0?'₪'+ex.price:'חינם')+'</div><button class="btn-sm" data-i="'+i+'">🗑</button></div>').join('');
-  el.querySelectorAll('button[data-i]').forEach(btn=>{btn.onclick=async function(){var i=parseInt(this.dataset.i);D.settings.extras.splice(i,1);await saveSettings();renderExtrasList();showToast('✅ הוסר');};});
+  if(!exs.length){el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px 0;">אין תוספות – הוסף למטה</div>';renderProdExtrasCheckboxes();return;}
+  el.innerHTML=exs.map((ex,i)=>
+    '<div class="extra-row">'
+    +'<div class="extra-row-name">'+esc(ex.name)+'</div>'
+    +'<input type="number" min="0" value="'+(ex.price||0)+'" placeholder="₪0" data-i="'+i+'" class="extra-price-inp" style="width:65px;font-family:\'Heebo\',sans-serif;font-size:12px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:var(--bg);text-align:center;"/>'
+    +'<button class="btn-sm extra-del" data-i="'+i+'">🗑</button>'
+    +'</div>'
+  ).join('');
+  el.querySelectorAll('.extra-price-inp').forEach(inp=>{inp.onchange=async function(){var i=parseInt(this.dataset.i);D.settings.extras[i].price=parseFloat(this.value)||0;await saveSettings();renderProdExtrasCheckboxes();showToast('✅ מחיר עודכן');};});
+  el.querySelectorAll('.extra-del').forEach(btn=>{btn.onclick=async function(){var i=parseInt(this.dataset.i);D.settings.extras.splice(i,1);await saveSettings();renderExtrasList();showToast('✅ הוסר');};});
+  renderProdExtrasCheckboxes();
+}
+function renderProdExtrasCheckboxes(){
+  var el=document.getElementById('prod-extras-checks');
+  if(!el)return;
+  var exs=D.settings.extras||[];
+  if(!exs.length){el.innerHTML='<span style="font-size:12px;color:var(--muted);">הגדר תוספות בהגדרות</span>';return;}
+  el.innerHTML=exs.map(ex=>'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:400;"><input type="checkbox" value="'+esc(ex.name)+'" style="width:auto;padding:0;border:none;background:none;"> '+esc(ex.name)+(ex.price>0?' <span style="color:var(--blue);font-size:11px;font-weight:700;">+₪'+ex.price+'</span>':'')+'</label>').join('');
 }
 async function addExtra(){
   var nameInp=document.getElementById('new-extra-name');
