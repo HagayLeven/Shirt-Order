@@ -400,6 +400,15 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
   .sum-box{box-shadow:none!important;border:1px solid #ddd!important;}
 }
 
+/* PAUSE BUTTON */
+#pause-btn{background:#E06000;border:none;border-radius:8px;padding:6px 14px;color:#fff;font-family:'Heebo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;}
+#pause-btn.paused{background:var(--green);}
+#pause-btn:hover{filter:brightness(1.15);}
+
+/* PAUSE BANNER */
+#pause-banner{background:#CC1111;color:#fff;padding:14px 20px;text-align:center;font-size:15px;font-weight:700;display:none;position:relative;z-index:2;}
+#pause-banner.show{display:block;}
+
 @media(max-width:560px){
   .fg{grid-template-columns:1fr;}
   .prod-grid{grid-template-columns:repeat(2,1fr);}
@@ -659,6 +668,7 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
 
 <!-- CUSTOMER -->
 <div id="pg-customer" class="page">
+  <div id="pause-banner">🚫 ההזמנות מושהות כרגע – אין קמפיין פעיל. נעדכן בקרוב!</div>
   <div class="topbar">
     <div class="tb-brand">
       <svg width="30" height="30" viewBox="0 0 30 30"><polygon points="15,2 18,10 27,10 20,15 23,23 15,18 7,23 10,15 3,10 12,10" fill="white" opacity=".9"/><polygon points="15,5 17,11 24,11 19,15 21,21 15,17 9,21 11,15 6,11 13,11" fill="#CC1111"/><rect x="13" y="8" width="4" height="12" fill="white" rx="1"/><rect x="9" y="12" width="12" height="4" fill="white" rx="1"/></svg>
@@ -764,6 +774,7 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
     <div class="tb-right">
       <div class="tb-badge">₪<span id="a-total">0</span></div>
       <div class="tb-badge" id="a-count-badge">0 הזמנות</div>
+      <button id="pause-btn">⏸ השהה הזמנות</button>
       <button class="tb-btn" id="admin-out-btn">יציאה</button>
     </div>
   </div>
@@ -1002,7 +1013,7 @@ var D = {
   orders: {},
   products: [],
   cats: ['חולצות','פאטצ׳ים','אביזרים','אחר'],
-  settings: {pwd:'mda2024',bit:'',paybox:'',email:'',ntfy:'',orgname:'מד"א לכיש',deadline:'',extras:[{name:'לוגו מד"א',price:0},{name:'לוגו יחידה',price:0},{name:'שם על גב',price:0},{name:'דגל ישראל',price:0}]},
+  settings: {pwd:'mda2024',bit:'',paybox:'',email:'',ntfy:'',orgname:'מד"א לכיש',deadline:'',paused:false,extras:[{name:'לוגו מד"א',price:0},{name:'לוגו יחידה',price:0},{name:'שם על גב',price:0},{name:'דגל ישראל',price:0}]},
   cart: [],
   activeCat: 'all',
   pendingId: null,
@@ -1043,6 +1054,7 @@ async function initFirebase() {
     const settSnap = await get(ref(db,'settings'));
     if (settSnap.exists()) D.settings = Object.assign(D.settings, settSnap.val());
     renderCountdown();
+    applyPauseState();
 
     // Load products
     const prodSnap = await get(ref(db,'products'));
@@ -1222,6 +1234,8 @@ document.querySelectorAll('.arch-tab').forEach(btn=>{btn.onclick=function(){_arc
 document.getElementById('filter-date-from').onchange=renderAdminOrders;
 document.getElementById('filter-date-to').onchange=renderAdminOrders;
 document.getElementById('clear-dates-btn').onclick=function(){document.getElementById('filter-date-from').value='';document.getElementById('filter-date-to').value='';renderAdminOrders();};
+// Pause toggle
+document.getElementById('pause-btn').onclick=togglePause;
 // Summary actions
 document.getElementById('wa-sum-btn').onclick=shareSummaryWA;
 document.getElementById('print-btn').onclick=()=>window.print();
@@ -1316,7 +1330,8 @@ function renderProdGrid() {
     html+='<div class="pc-name">'+esc(p.name)+(p.color?' · '+esc(p.color):'')+'</div>';
     html+='<div class="pc-cat">'+esc(p.cat||'')+'</div>';
     html+='<div class="pc-price">'+(p.price?'₪'+p.price:'ללא מחיר')+'</div>';
-    html+='<button class="pc-btn'+(inCart?' in':'')+'" data-pid="'+p.id+'">'+(inCart?'✓ בסל':'+ הוסף לסל')+'</button>';
+    var paused=!!D.settings.paused;
+    html+='<button class="pc-btn'+(inCart?' in':'')+(paused?' disabled':'')+'" data-pid="'+p.id+'"'+(paused?' disabled style="opacity:.45;cursor:not-allowed;"':'')+'>'+(paused?'🚫 מושהה':inCart?'✓ בסל':'+ הוסף לסל')+'</button>';
     html+='</div>';
   });
   grid.innerHTML=html;
@@ -1374,6 +1389,7 @@ function renderCart(){
 
 // ══ SUBMIT ORDER ══
 async function submitOrder() {
+  if (D.settings.paused) { showToast('🚫 ההזמנות מושהות כרגע',true); return; }
   if (Date.now() - _lastOrderMs < 30000) { showToast('⚠️ המתן רגע לפני שליחת הזמנה נוספת',true); return; }
   var name=document.getElementById('c-name').value.trim().substring(0,60);
   var phone=document.getElementById('c-phone').value.trim().replace(/[\s\-]/g,'').substring(0,15);
@@ -1963,6 +1979,28 @@ async function doSaveSettings(){
   D.settings.orgname=document.getElementById('s-orgname').value.trim().substring(0,60);
   D.settings.deadline=document.getElementById('s-deadline').value;
   await saveSettings(); renderCountdown(); showToast('✅ הגדרות נשמרו!');
+}
+
+// ══ PAUSE / RESUME ══
+function applyPauseState(){
+  var paused=!!D.settings.paused;
+  // Update admin button
+  var btn=document.getElementById('pause-btn');
+  if(btn){btn.textContent=paused?'▶ חדש הזמנות':'⏸ השהה הזמנות';btn.classList.toggle('paused',paused);}
+  // Show/hide customer banner
+  var banner=document.getElementById('pause-banner');
+  if(banner) banner.classList.toggle('show',paused);
+  // Disable/enable submit button
+  var sub=document.getElementById('submit-order-btn');
+  if(sub){sub.disabled=paused;sub.style.opacity=paused?'0.45':'1';sub.title=paused?'ההזמנות מושהות':'';sub.textContent=paused?'🚫 ההזמנות מושהות':'✅ אשר ועבור לתשלום';}
+  // Disable/enable shop tab add-to-cart buttons (re-render if grid visible)
+  if(document.getElementById('ct-shop')&&document.getElementById('ct-shop').classList.contains('on')) renderProdGrid();
+}
+async function togglePause(){
+  D.settings.paused=!D.settings.paused;
+  await saveSettings();
+  applyPauseState();
+  showToast(D.settings.paused?'⏸ הזמנות הושהו':'▶ הזמנות חודשו!',D.settings.paused);
 }
 
 // ══ LIGHTBOX ══
