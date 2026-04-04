@@ -1711,13 +1711,26 @@ function renderExtrasList(){
   var exs=D.settings.extras||[];
   if(!exs.length){el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px 0;">אין תוספות – הוסף למטה</div>';renderProdExtrasCheckboxes();return;}
   el.innerHTML=exs.map((ex,i)=>
-    '<div class="extra-row">'
-    +'<div class="extra-row-name">'+esc(ex.name)+'</div>'
+    '<div class="extra-row" id="exrow-'+i+'">'
+    +'<div class="extra-row-name" id="exname-'+i+'">'+esc(ex.name)+'</div>'
     +'<input type="number" min="0" value="'+(ex.price||0)+'" placeholder="₪0" data-i="'+i+'" class="extra-price-inp" style="width:65px;font-family:\'Heebo\',sans-serif;font-size:12px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:var(--bg);text-align:center;"/>'
+    +'<button class="btn-sm extra-edit" data-i="'+i+'" title="ערוך שם">✏️</button>'
     +'<button class="btn-sm extra-del" data-i="'+i+'">🗑</button>'
     +'</div>'
   ).join('');
   el.querySelectorAll('.extra-price-inp').forEach(inp=>{inp.onchange=async function(){var i=parseInt(this.dataset.i);D.settings.extras[i].price=parseFloat(this.value)||0;await saveSettings();renderProdExtrasCheckboxes();showToast('✅ מחיר עודכן');};});
+  el.querySelectorAll('.extra-edit').forEach(btn=>{btn.onclick=function(){
+    var i=parseInt(this.dataset.i);
+    var nameDiv=document.getElementById('exname-'+i);
+    var row=document.getElementById('exrow-'+i);
+    var cur=D.settings.extras[i].name;
+    nameDiv.innerHTML='<input type="text" value="'+esc(cur)+'" maxlength="40" style="font-family:\'Heebo\',sans-serif;font-size:13px;padding:3px 7px;border:1.5px solid var(--red);border-radius:6px;background:#fff;width:100%;"/>';
+    var inp=nameDiv.querySelector('input');
+    inp.focus();inp.select();
+    var save=async()=>{var v=inp.value.trim();if(!v){inp.focus();return;}if(v!==cur&&(D.settings.extras||[]).find((e,j)=>e.name===v&&j!==i)){showToast('⚠️ שם זה כבר קיים',true);inp.focus();return;}D.settings.extras[i].name=v;await saveSettings();renderExtrasList();showToast('✅ שם עודכן');};
+    inp.onkeydown=function(e){if(e.key==='Enter')save();if(e.key==='Escape')renderExtrasList();};
+    this.textContent='✔️';this.onclick=save;
+  };});
   el.querySelectorAll('.extra-del').forEach(btn=>{btn.onclick=async function(){var i=parseInt(this.dataset.i);D.settings.extras.splice(i,1);await saveSettings();renderExtrasList();showToast('✅ הוסר');};});
   renderProdExtrasCheckboxes();
 }
