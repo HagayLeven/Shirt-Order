@@ -1030,6 +1030,7 @@ var _ordChart = null;
 var _dragSrcId = null;
 
 const SIZES = ['XS','S','M','L','XL','XXL','3XL'];
+const CERT_EXTRAS = ['מגיש עזרה ראשונה','חובש','חובש בכיר','פראמדיק','ללא הסמכה רפואית'];
 
 // ══ SECURITY UTILS ══
 function esc(s) {
@@ -1075,6 +1076,16 @@ async function initFirebase() {
       await set(ref(db,'products'), Object.fromEntries(defaults.map(p=>[p.id,p])));
       D.products = defaults;
     }
+
+    // הוסף גלופות הסמכה רפואית אם חסרות
+    var extrasChanged = false;
+    CERT_EXTRAS.forEach(name => {
+      if (!D.settings.extras.find(e => e.name === name)) {
+        D.settings.extras.push({name, price: 0});
+        extrasChanged = true;
+      }
+    });
+    if (extrasChanged) await saveSettings();
 
     // Restore cart from localStorage
     loadCartLocal();
@@ -1360,7 +1371,13 @@ function renderCart(){
     html+='<div class="size-row" id="sr-'+p.id+'">';
     SIZES.forEach(s=>{html+='<button class="sz'+(item.size===s?' on':'')+'" data-pid="'+p.id+'" data-s="'+s+'">'+s+'</button>';});
     html+='</div><div class="extras-row" id="xr-'+p.id+'">';
-    (D.settings.extras||[]).forEach(ex=>{var ep=ex.price>0?'<span class="xt-p">+₪'+ex.price+'</span>':'';html+='<span class="xt'+(item.extras.includes(ex.name)?' on':'')+'" data-pid="'+p.id+'" data-e="'+encodeURIComponent(ex.name)+'">'+(ex.name==='דגל ישראל'?'🇮🇱 ':'')+esc(ex.name)+ep+'</span>';});
+    var regularExtras=(D.settings.extras||[]).filter(ex=>!CERT_EXTRAS.includes(ex.name));
+    var certExtrasAvail=(D.settings.extras||[]).filter(ex=>CERT_EXTRAS.includes(ex.name));
+    regularExtras.forEach(ex=>{var ep=ex.price>0?'<span class="xt-p">+₪'+ex.price+'</span>':'';html+='<span class="xt'+(item.extras.includes(ex.name)?' on':'')+'" data-pid="'+p.id+'" data-e="'+encodeURIComponent(ex.name)+'">'+(ex.name==='דגל ישראל'?'🇮🇱 ':'')+esc(ex.name)+ep+'</span>';});
+    if(certExtrasAvail.length){
+      html+='</div><div style="font-size:10px;font-weight:700;color:var(--muted);margin:6px 0 3px;">🩺 הסמכה רפואית (בחר אחת):</div><div class="extras-row" id="cr-'+p.id+'">';
+      certExtrasAvail.forEach(ex=>{html+='<span class="xt'+(item.extras.includes(ex.name)?' on':'')+' cert-xt" data-pid="'+p.id+'" data-e="'+encodeURIComponent(ex.name)+'">'+esc(ex.name)+'</span>';});
+    }
     html+='</div></div>';
     html+='<div class="ci-right"><div class="qty-ctrl"><button class="q-btn" data-pid="'+p.id+'" data-d="-1">−</button><div class="q-val" id="qv-'+p.id+'">'+item.qty+'</div><button class="q-btn" data-pid="'+p.id+'" data-d="1">+</button></div>';
     html+='<div class="ci-price" id="cp-'+p.id+'">'+(p.price?'₪'+(p.price*item.qty):'')+'</div>';
@@ -1368,7 +1385,21 @@ function renderCart(){
   });
   el.innerHTML=html;
   el.querySelectorAll('.sz').forEach(btn=>{ btn.onclick=function(){ var pid=parseInt(this.dataset.pid),s=this.dataset.s; var item=D.cart.find(c=>c.pid===pid); if(item)item.size=s; document.querySelectorAll('#sr-'+pid+' .sz').forEach(b=>b.classList.toggle('on',b.dataset.s===s)); }; });
-  el.querySelectorAll('.xt').forEach(tag=>{ tag.onclick=function(){ var pid=parseInt(this.dataset.pid),e=decodeURIComponent(this.dataset.e); var item=D.cart.find(c=>c.pid===pid); if(!item)return; var idx=item.extras.indexOf(e); if(idx>=0){item.extras.splice(idx,1);this.classList.remove('on');}else{item.extras.push(e);this.classList.add('on');} }; });
+  el.querySelectorAll('.xt').forEach(tag=>{ tag.onclick=function(){
+    var pid=parseInt(this.dataset.pid),e=decodeURIComponent(this.dataset.e);
+    var item=D.cart.find(c=>c.pid===pid); if(!item)return;
+    // אם זו הסמכה רפואית – בחירה בלעדית (כמו radio)
+    if(CERT_EXTRAS.includes(e)){
+      item.extras=item.extras.filter(ex=>!CERT_EXTRAS.includes(ex));
+      document.querySelectorAll('#cr-'+pid+' .cert-xt').forEach(t=>t.classList.remove('on'));
+      var alreadyOn=this.classList.contains('on');
+      if(!alreadyOn){item.extras.push(e);this.classList.add('on');}
+    } else {
+      var idx=item.extras.indexOf(e);
+      if(idx>=0){item.extras.splice(idx,1);this.classList.remove('on');}
+      else{item.extras.push(e);this.classList.add('on');}
+    }
+  }; });
   el.querySelectorAll('.q-btn').forEach(btn=>{ btn.onclick=function(){ var pid=parseInt(this.dataset.pid),d=parseInt(this.dataset.d); var item=D.cart.find(c=>c.pid===pid); if(!item)return; item.qty=Math.max(1,item.qty+d); var qv=document.getElementById('qv-'+pid);if(qv)qv.textContent=item.qty; var p=D.products.find(pr=>pr.id===pid); var cp=document.getElementById('cp-'+pid);if(cp)cp.textContent=p.price?'₪'+(p.price*item.qty):''; updateCostBar(); var badge=document.querySelector('[data-pid="'+pid+'"] .pc-badge');if(badge)badge.textContent=item.qty; }; });
   el.querySelectorAll('.ci-rm').forEach(btn=>{ btn.onclick=function(){ var pid=parseInt(this.dataset.pid); D.cart=D.cart.filter(c=>c.pid!==pid); renderProdGrid();updateBadge();renderCart();updateCostBar(); }; });
 }
