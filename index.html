@@ -875,6 +875,10 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
       <div class="sec-lbl">מוצרים קיימים</div>
       <div class="mp-grid" id="manage-grid"></div>
       <div id="no-prods" class="c-empty" style="display:none;"><div class="eico">👕</div><p>אין מוצרים עדיין</p></div>
+      <div style="margin-top:20px;padding-top:16px;border-top:2px dashed var(--border);text-align:center;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">ייבוא קטלוג מוצרים ראשוני – לחץ פעם אחת בלבד</div>
+        <button class="btn btn-green" id="import-catalog-btn">📦 ייבוא קטלוג (17 מוצרים)</button>
+      </div>
     </div>
     <div id="at-settings" class="tab-panel">
       <div class="set-card">
@@ -1228,6 +1232,7 @@ document.getElementById('close-modal-btn').onclick=()=>document.getElementById('
 document.getElementById('p-img-inp').onchange=function(){prevImg(this);};
 document.getElementById('edit-img-inp').onchange=function(){prevImgTo(this,'edit-img-prev','edit-up-hint');};
 document.getElementById('add-extra-btn').onclick=addExtra;
+document.getElementById('import-catalog-btn').onclick=importCatalog;
 // Archive tabs
 document.querySelectorAll('.arch-tab').forEach(btn=>{btn.onclick=function(){_archFilter=this.dataset.arch;document.querySelectorAll('.arch-tab').forEach(b=>b.classList.toggle('on',b===this));renderAdminOrders();};});
 // Date filter
@@ -1913,6 +1918,50 @@ async function addExtra(){
   await saveSettings();
   nameInp.value='';priceInp.value='';
   renderExtrasList();showToast('✅ תוספת נוספה');
+}
+
+// ══ CATALOG IMPORT ══
+const CATALOG_PRODUCTS = [
+  // חולצות T
+  {name:'חולצת T – חובש',            cat:'חולצות',   color:'שחור', price:35,  img:null},
+  {name:'חולצת T – חובש',            cat:'חולצות',   color:'לבן',  price:35,  img:null},
+  {name:'חולצת T – חובש בכיר',       cat:'חולצות',   color:'שחור', price:35,  img:null},
+  {name:'חולצת T – פראמדיק',         cat:'חולצות',   color:'שחור', price:35,  img:null},
+  {name:'חולצת T – פראמדיק',         cat:'חולצות',   color:'לבן',  price:35,  img:null},
+  {name:'חולצת T – שאגת הארי',       cat:'חולצות',   color:'לבן',  price:35,  img:null},
+  {name:'חולצת T – שאגת הארי',       cat:'חולצות',   color:'שחור', price:35,  img:null},
+  // קפוצונים
+  {name:'קפוצון – יחידת האופנועים',  cat:'קפוצונים', color:'שחור', price:70,  img:null},
+  {name:'קפוצון – פראמדיק',          cat:'קפוצונים', color:'לבן',  price:70,  img:null},
+  {name:'קפוצון – חובש בכיר',        cat:'קפוצונים', color:'שחור', price:70,  img:null},
+  // סופטשל
+  {name:'סופטשל – יחידת האופנועים',  cat:'סופטשל',   color:'שחור', price:170, img:null},
+  {name:'סופטשל – פארמדיק',          cat:'סופטשל',   color:'שחור', price:170, img:null},
+  {name:'סופטשל – פארמדיקית',        cat:'סופטשל',   color:'שחור', price:170, img:null},
+  {name:'סופטשל – חובשת',            cat:'סופטשל',   color:'שחור', price:170, img:null},
+  {name:'סופטשל – חובש',             cat:'סופטשל',   color:'שחור', price:170, img:null},
+  // אקססוריז
+  {name:'חם צוואר – יחידת האופנועים',cat:'אקססוריז', color:'שחור', price:30,  img:null},
+  {name:'שרוול ארוך',                cat:'חולצות',   color:'שחור', price:35,  img:null},
+];
+async function importCatalog(){
+  var btn=document.getElementById('import-catalog-btn');
+  if(!confirm('לייבא '+CATALOG_PRODUCTS.length+' מוצרים? המוצרים הקיימים לא יימחקו.')) return;
+  btn.disabled=true; btn.textContent='מייבא...';
+  // עדכון קטגוריות
+  ['חולצות','קפוצונים','סופטשל','אקססוריז'].forEach(c=>{if(!D.cats.includes(c))D.cats.push(c);});
+  await saveCats();
+  // הוספת מוצרים אחד אחד
+  var base=Date.now();
+  for(var i=0;i<CATALOG_PRODUCTS.length;i++){
+    var p=Object.assign({},CATALOG_PRODUCTS[i],{id:base+i*100});
+    D.products.push(p);
+    try{ await saveOneProduct(p); }catch(e){ console.error('import error',e); }
+    btn.textContent='מייבא '+(i+1)+'/'+CATALOG_PRODUCTS.length+'...';
+  }
+  renderManage(); renderCatList(); fillCatSel(); renderCatsBar();
+  btn.textContent='✅ יובאו '+CATALOG_PRODUCTS.length+' מוצרים!';
+  showToast('✅ הקטלוג יובא בהצלחה!');
 }
 
 // ══ CATEGORIES ══
