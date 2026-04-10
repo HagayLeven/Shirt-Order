@@ -665,10 +665,9 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
   <div class="login-card">
     <div class="lico">🔐</div>
     <h2>כניסת מנהל</h2>
-    <p>הכנס את פרטי הכניסה שלך</p>
-    <input type="email" class="inp-base" id="admin-email" placeholder="אימייל" value="hagayas2001@gmail.com" autocomplete="email" required/>
+    <p>הכנס את הסיסמה שלך</p>
     <input type="password" class="inp-base" id="pwd-inp" placeholder="סיסמה" autocomplete="current-password"/>
-    <div class="login-err" id="login-err">❌ אימייל או סיסמה שגויים</div>
+    <div class="login-err" id="login-err">❌ סיסמה שגויה</div>
     <button class="btn btn-red" style="width:100%;justify-content:center;margin-bottom:10px;" id="do-login">כנס למערכת ←</button>
     <button class="btn btn-gray" style="width:100%;justify-content:center;" id="login-back">← חזרה</button>
   </div>
@@ -1236,7 +1235,6 @@ document.getElementById('h-track').onclick=()=>{show('pg-customer');renderCatsBa
 document.getElementById('h-admin').onclick=()=>{show('pg-login');document.getElementById('pwd-inp').value='';document.getElementById('login-err').style.display='none';};
 document.getElementById('do-login').onclick=doLogin;
 document.getElementById('pwd-inp').onkeydown=(e)=>{if(e.key==='Enter')doLogin();};
-document.getElementById('admin-email').onkeydown=(e)=>{if(e.key==='Enter')document.getElementById('pwd-inp').focus();};
 document.getElementById('login-back').onclick=()=>show('pg-home');
 document.querySelectorAll('#pg-customer .tab').forEach(btn=>{btn.onclick=function(){switchTab('customer',this.dataset.tab);};});
 document.getElementById('c-home-btn').onclick=()=>show('pg-home');
@@ -1303,20 +1301,13 @@ async function doLogin() {
     document.getElementById('login-err').textContent = 'נסיונות רבים מדי – נסה שוב עוד ' + sec + ' שניות';
     document.getElementById('login-err').style.display='block'; return;
   }
-  var email = document.getElementById('admin-email').value.trim();
   var password = document.getElementById('pwd-inp').value;
-  if (!email) {
-    document.getElementById('login-err').textContent = 'נא להזין אימייל';
-    document.getElementById('login-err').style.display='block'; return;
-  }
   if (!password) {
     document.getElementById('login-err').textContent = 'נא להזין סיסמה';
     document.getElementById('login-err').style.display='block'; return;
   }
-
-  // Firebase Auth בלבד – אין fallback מקומי
   try {
-    await signInWithEmailAndPassword(auth, email, password);
+    await signInWithEmailAndPassword(auth, atob('aGFnYXlhczIwMDFAZ21haWwuY29t'), password);
     _loginAttempts = 0;
     document.getElementById('login-err').style.display='none';
     document.getElementById('pwd-inp').value='';
@@ -1325,7 +1316,7 @@ async function doLogin() {
   } catch(e) {
     _loginAttempts++;
     if (_loginAttempts >= 5) { _loginLockUntil = Date.now() + 60000; _loginAttempts = 0; }
-    var msg = 'אימייל או סיסמה שגויים';
+    var msg = 'סיסמה שגויה';
     if (_loginAttempts >= 3) msg += ' (' + (5 - _loginAttempts) + ' נסיונות נותרו)';
     document.getElementById('login-err').textContent = msg;
     document.getElementById('login-err').style.display='block';
