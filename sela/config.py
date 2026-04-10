@@ -40,3 +40,9 @@ CLAUDE_MODEL = "claude-opus-4-6"   # change to "claude-sonnet-4-6" to reduce cos
 
 SAVE_REPORT = True          # write report to a timestamped .txt file
 REPORTS_DIR = "reports"     # subdirectory for saved reports (created if absent)
+
+# ─── Telegram Bot ─────────────────────────────────────────────────────────────
+
+TELEGRAM_BOT_TOKEN = "8636112784:AAGkAdJsBIH0TSgpk4Xngq47u_WNYSsUM88"
+TELEGRAM_CHAT_ID   = 753995107
+DAILY_REPORT_HOUR  = 8    # 08:00 — שנה אם תרצה שעה אחרת
