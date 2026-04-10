@@ -1,2 +1,3 @@
 anthropic>=0.50.0
 yfinance>=0.2.40
+flask>=2.3
