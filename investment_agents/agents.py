@@ -19,10 +19,12 @@ from datetime import datetime
 import anthropic
 import yfinance as yf
 
+import config
+
 # ─── Client & Model ──────────────────────────────────────────────────────────
 
 client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from environment
-MODEL = "claude-opus-4-6"
+MODEL = config.CLAUDE_MODEL
 
 # ─── Tool Definitions ────────────────────────────────────────────────────────
 
@@ -345,29 +347,20 @@ AGENT 3 — PORTFOLIO STRATEGIST (Hagay's Recommendations)
 # ─── Entry Point ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # Default watchlist — edit to taste
-    watchlist = [
-        "CVX",   # Chevron — US energy major; Hormuz / oil-supply play
-        "XOM",   # ExxonMobil — oil geopolitics
-        "LMT",   # Lockheed Martin — defense/aerospace
-        "RTX",   # Raytheon Technologies — defense/missiles
-        "QQQ",   # Nasdaq-100 ETF — tech-recovery proxy
-    ]
-
-    # Israeli listings require the ".TA" suffix, e.g.:
-    #   "ESLT.TA"  — Elbit Systems (Israeli defense prime)
-    #   "NWMD.TA"  — NewMed Energy (Israeli natural gas)
-
     report = run_round_table(
-        stocks=watchlist,
-        budget_nis=5000,
-        monthly_nis=1500,
+        stocks=config.WATCHLIST,
+        budget_nis=config.LUMP_SUM_NIS,
+        monthly_nis=config.MONTHLY_NIS,
     )
 
     print(report)
 
-    # Save to a timestamped file
-    filename = f"investment_report_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
-    with open(filename, "w", encoding="utf-8") as fh:
-        fh.write(report)
-    print(f"Report saved → {filename}")
+    if config.SAVE_REPORT:
+        os.makedirs(config.REPORTS_DIR, exist_ok=True)
+        filename = os.path.join(
+            config.REPORTS_DIR,
+            f"report_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+        )
+        with open(filename, "w", encoding="utf-8") as fh:
+            fh.write(report)
+        print(f"Report saved → {filename}")
