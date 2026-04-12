@@ -169,6 +169,11 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--txt);direct
 .c-empty{text-align:center;padding:32px;color:var(--muted);}
 .c-empty .eico{font-size:40px;margin-bottom:10px;}
 
+/* DELIVERY TOGGLE */
+.delivery-toggle{display:flex;gap:8px;flex-wrap:wrap;}
+.dtog-btn{font-family:'Heebo',sans-serif;font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1.5px solid var(--border);background:#fff;color:var(--muted);cursor:pointer;transition:all .15s;flex:1;text-align:center;}
+.dtog-btn.on{border-color:var(--red);background:#FFF0F0;color:var(--red);}
+
 /* COST BAR */
 .cost-bar{background:var(--dark);color:#fff;border-radius:var(--rl);padding:16px 20px;display:flex;justify-content:space-around;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
 .cb-stat{text-align:center;}
@@ -716,6 +721,35 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
           <div class="ff"><label>אימייל *</label><input type="email" id="c-email" placeholder="your@email.com" dir="ltr" maxlength="100"/></div>
           <div class="ff full"><label>הערות</label><textarea id="c-notes" placeholder="בקשות מיוחדות..." maxlength="300"></textarea></div>
         </div>
+        <!-- תחנה ומשלוח (מופיע רק כשמופעל) -->
+        <div id="station-section" style="display:none;margin-top:14px;padding-top:14px;border-top:1.5px dashed var(--border);">
+          <div class="sec-lbl" style="margin-bottom:10px;font-size:12px;">📍 תחנה ואיסוף</div>
+          <div class="fg">
+            <div class="ff">
+              <label>תחנה משוייכת *</label>
+              <select id="c-station">
+                <option value="">-- בחר תחנה --</option>
+                <option value="אשקלון">אשקלון</option>
+                <option value="אשדוד">אשדוד</option>
+                <option value="קרית מלאכי">קרית מלאכי</option>
+                <option value="קרית גת">קרית גת</option>
+                <option value="גן יבנה">גן יבנה</option>
+                <option value="שדרות">שדרות</option>
+              </select>
+            </div>
+            <div class="ff">
+              <label>אופן קבלה *</label>
+              <div class="delivery-toggle">
+                <button type="button" class="dtog-btn on" id="dtog-pickup" onclick="setDeliveryType('pickup')">🏠 איסוף מהתחנה</button>
+                <button type="button" class="dtog-btn" id="dtog-deliver" onclick="setDeliveryType('deliver')">🚚 משלוח לכתובת</button>
+              </div>
+            </div>
+            <div class="ff full" id="address-field" style="display:none;">
+              <label>כתובת למשלוח *</label>
+              <input type="text" id="c-address" placeholder="רחוב, מספר, עיר" maxlength="120"/>
+            </div>
+          </div>
+        </div>
         <div class="f-actions">
           <button class="btn btn-red" id="submit-order-btn">✅ אשר ועבור לתשלום</button>
           <button class="btn btn-gray" id="reset-form-btn">נקה הכל</button>
@@ -952,6 +986,10 @@ hr.div{border:none;border-top:1px solid var(--warm);margin:14px 0;}
           <input type="date" class="set-inp" id="s-deadline"/>
         </div>
         <div class="set-row">
+          <div><div class="set-lbl">📍 תחנה ומשלוח</div><div class="set-sub">הצג שדות תחנה / איסוף / כתובת בטופס ההזמנה</div></div>
+          <button id="s-station-toggle" class="btn btn-gray" style="padding:7px 18px;font-size:13px;"></button>
+        </div>
+        <div class="set-row">
           <div><div class="set-lbl">🔑 סיסמת מנהל</div><div class="set-sub">מנוהלת דרך Firebase Authentication</div></div>
           <span style="font-size:12px;color:var(--muted);">שנה ב-Firebase Console</span>
         </div>
@@ -1040,7 +1078,7 @@ var D = {
   orders: {},
   products: [],
   cats: ['חולצות','פאטצ׳ים','אביזרים','אחר'],
-  settings: {pwd:'mda2024',bit:'',bitEnabled:true,paybox:'',email:'',ntfy:'',orgname:'מד"א לכיש',deadline:'',paused:false,extras:[{name:'לוגו מד"א',price:0},{name:'לוגו יחידה',price:0},{name:'שם על גב',price:0},{name:'דגל ישראל',price:0}]},
+  settings: {pwd:'mda2024',bit:'',bitEnabled:true,paybox:'',email:'',ntfy:'',orgname:'מד"א לכיש',deadline:'',paused:false,stationEnabled:false,extras:[{name:'לוגו מד"א',price:0},{name:'לוגו יחידה',price:0},{name:'שם על גב',price:0},{name:'דגל ישראל',price:0}]},
   cart: [],
   activeCat: 'all',
   pendingId: null,
@@ -1051,6 +1089,7 @@ var D = {
 var _archFilter = 'active';
 var _ordChart = null;
 var _dragSrcId = null;
+var _deliveryType = 'pickup';
 
 const SIZES = ['XS','S','M','L','XL','XXL','3XL'];
 const CERT_EXTRAS = ['מגיש עזרה ראשונה','חובש','חובש בכיר','פראמדיק','ללא הסמכה רפואית'];
@@ -1084,6 +1123,7 @@ async function initFirebase() {
     renderCountdown();
     applyPauseState();
     applyPaymentVisibility();
+    applyStationSection();
 
     // Load products
     const prodSnap = await get(ref(db,'products'));
@@ -1278,6 +1318,8 @@ document.getElementById('s-bit-toggle').onclick=()=>togglePayMethod('bitEnabled'
 document.getElementById('s-paybox-toggle').onclick=()=>togglePayMethod('payboxEnabled');
 document.getElementById('s-bank-toggle').onclick=()=>togglePayMethod('bankEnabled');
 document.getElementById('s-cash-toggle').onclick=()=>togglePayMethod('cashEnabled');
+// Station toggle
+document.getElementById('s-station-toggle').onclick=toggleStation;
 // Pause toggle
 document.getElementById('pause-btn').onclick=togglePause;
 // Summary actions
@@ -1443,13 +1485,24 @@ async function submitOrder() {
   if(!D.cart.length){showToast('⚠️ הסל ריק',true);return;}
   var miss=D.cart.find(c=>!c.size);
   if(miss){var pm=D.products.find(pr=>pr.id===miss.pid);showToast('⚠️ בחר מידה: '+(pm?pm.name:''),true);return;}
+  // תחנה ומשלוח
+  var station='', deliveryType='', address='';
+  if(D.settings.stationEnabled){
+    station=(document.getElementById('c-station').value||'').trim();
+    if(!station){showToast('⚠️ אנא בחר תחנה',true);return;}
+    deliveryType=_deliveryType;
+    if(deliveryType==='deliver'){
+      address=(document.getElementById('c-address').value||'').trim().substring(0,120);
+      if(!address){showToast('⚠️ אנא הכנס כתובת למשלוח',true);return;}
+    }
+  }
   var items=D.cart.map(c=>{ var p=D.products.find(pr=>pr.id===c.pid); var extrasPrice=(c.extras||[]).reduce((s,en)=>{var ex=(D.settings.extras||[]).find(e=>e.name===en);return s+(ex&&ex.price>0?ex.price:0);},0); return{pid:p.id,product:p.name,color:p.color||'',price:p.price||0,qty:c.qty,size:c.size,extras:[...c.extras],extrasPrice,lineTotal:((p.price||0)+extrasPrice)*c.qty}; });
   var total=items.reduce((s,i)=>s+i.lineTotal,0);
   var maxNum=Object.values(D.orders).reduce(function(mx,o){var n=parseInt((o.orderNum||'').replace('MDA-',''))||0;return Math.max(mx,n);},0);
   var num='MDA-'+String(maxNum+1).padStart(4,'0');
   var orderId=Date.now();
   var now=new Date();
-  var order={id:orderId,orderNum:num,name,phone,email,notes,items,total,status:'received',payMethod:'',date:now.toLocaleDateString('he-IL'),time:now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};
+  var order={id:orderId,orderNum:num,name,phone,email,notes,station,deliveryType,address,items,total,status:'received',payMethod:'',date:now.toLocaleDateString('he-IL'),time:now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})};
   try {
     await saveOrder(order);
     _lastOrderMs = Date.now();
@@ -1481,6 +1534,7 @@ async function sendNotifications(order) {
   var itemsList = order.items.map(it =>
     '• ' + it.product + ' | מידה: ' + it.size + ' | כמות: ' + it.qty + (it.lineTotal ? ' | ₪' + it.lineTotal : '')
   ).join('\n');
+  var stationLine = order.station ? '\nתחנה: ' + order.station + (order.deliveryType==='deliver' ? ' | משלוח' + (order.address ? ' – ' + order.address : '') : ' | איסוף מהתחנה') : '';
 
   // מייל למנהל
   if (D.settings.email) {
@@ -1496,7 +1550,7 @@ async function sendNotifications(order) {
         total: '₪' + order.total,
         notes: order.notes || '—',
         date: order.date + ' ' + order.time,
-        message: '🚑 הזמנה חדשה!\n\nמספר: ' + order.orderNum + '\nשם: ' + order.name + '\nטלפון: ' + order.phone + '\nאימייל: ' + (order.email||'—') + '\n\n' + itemsList + '\n\nסה"כ: ₪' + order.total + (order.notes ? '\nהערות: ' + order.notes : '') + '\n\nתאריך: ' + order.date + ' ' + order.time
+        message: '🚑 הזמנה חדשה!\n\nמספר: ' + order.orderNum + '\nשם: ' + order.name + '\nטלפון: ' + order.phone + '\nאימייל: ' + (order.email||'—') + stationLine + '\n\n' + itemsList + '\n\nסה"כ: ₪' + order.total + (order.notes ? '\nהערות: ' + order.notes : '') + '\n\nתאריך: ' + order.date + ' ' + order.time
       });
       console.log('✅ מייל נשלח למנהל');
     } catch(e) { console.error('שגיאה במייל מנהל:', e); }
@@ -1586,7 +1640,7 @@ async function markPaid(method) {
     sendStatusUpdate(o);
   } catch(e) { showToast('⚠️ שגיאה בעדכון – נסה שוב',true); }
 }
-function resetForm(){D.cart=[];renderProdGrid();updateBadge();updateCostBar();['c-name','c-phone','c-email','c-notes'].forEach(id=>{document.getElementById(id).value='';});}
+function resetForm(){D.cart=[];renderProdGrid();updateBadge();updateCostBar();['c-name','c-phone','c-email','c-notes','c-address'].forEach(id=>{var el=document.getElementById(id);if(el)el.value='';});var st=document.getElementById('c-station');if(st)st.value='';setDeliveryType('pickup');}
 
 // ══ CONFIRM ══
 function renderConfirm(){
@@ -1594,7 +1648,10 @@ function renderConfirm(){
   document.getElementById('conf-num').textContent=o.orderNum;
   // Items summary
   var sumEl=document.getElementById('conf-items-summary');
-  if(sumEl) sumEl.innerHTML=o.items.map(it=>'• '+esc(it.product)+' '+esc(it.size)+' ×'+it.qty+(it.extras&&it.extras.length?' + '+it.extras.map(esc).join(', '):'')+(it.lineTotal?' – ₪'+it.lineTotal:'')).join('<br>');
+  if(sumEl){
+    var stTxt=o.station?'<div style="font-size:12px;color:var(--blue);margin-bottom:6px;">📍 '+esc(o.station)+(o.deliveryType==='deliver'?' · 🚚 משלוח'+(o.address?' – '+esc(o.address):''):(o.deliveryType==='pickup'?' · 🏠 איסוף מהתחנה':''))+'</div>':'';
+    sumEl.innerHTML=stTxt+o.items.map(it=>'• '+esc(it.product)+' '+esc(it.size)+' ×'+it.qty+(it.extras&&it.extras.length?' + '+it.extras.map(esc).join(', '):'')+(it.lineTotal?' – ₪'+it.lineTotal:'')).join('<br>');
+  }
   // WA share button
   var waBtn=document.getElementById('conf-wa-btn');
   if(waBtn){ waBtn.onclick=function(){var phone=(o.phone||'').replace(/[-\s+]/g,'');if(phone.startsWith('0'))phone='972'+phone.slice(1);var items=o.items.map(it=>it.product+' '+it.size+'×'+it.qty).join(', ');var msg='ההזמנה שלי '+o.orderNum+':\n'+items+'\nסה"כ: ₪'+o.total;window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');}; }
@@ -1659,6 +1716,7 @@ function ordHtml(o,i){
     +'<div class="a-body"><div class="a-name">'+esc(o.name)+' <span style="font-size:12px;color:var(--muted);">'+esc(o.phone)+(o.email?' · '+esc(o.email):'')+' · '+esc(o.orderNum)+'</span></div>'
     +'<div class="a-lines">'+o.items.map(it=>'<div class="a-line"><span class="tag tag-r">'+esc(it.product)+'</span><span class="tag">'+esc(it.size)+'</span><span class="tag">×'+it.qty+'</span>'+(it.extras||[]).map(e=>'<span class="tag">'+esc(e)+'</span>').join('')+(it.lineTotal?'<span style="font-weight:800;color:var(--red);font-size:12px;">₪'+it.lineTotal+'</span>':'')+'</div>').join('')+'</div>'
     +(o.notes?'<div class="a-notes">📝 '+esc(o.notes)+'</div>':'')
+    +(o.station?'<div style="font-size:11px;color:var(--blue);margin-top:2px;">📍 '+esc(o.station)+(o.deliveryType==='deliver'?' · 🚚 משלוח'+(o.address?' – '+esc(o.address):''):(o.deliveryType==='pickup'?' · 🏠 איסוף מהתחנה':''))+'</div>':'')
     +'<div style="font-size:10px;color:var(--muted);margin-top:3px;">'+esc(o.date)+' '+esc(o.time||'')+(o.payMethod?' · '+esc(o.payMethod):'')+'</div>'
     +histHtml+'</div>'
     +'<div class="a-right"><div class="a-total">'+(o.total?'₪'+o.total:'')+'</div>'
@@ -1780,14 +1838,14 @@ function copySummary(){
   var txt=(D.settings.orgname||'מד"א לכיש')+' – הזמנה\nתאריך: '+new Date().toLocaleDateString('he-IL')+' | סה"כ: '+orders.length+'\n\n== לפי פריט, מידה וגלופה ==\n';
   Object.entries(byP).forEach(([p,d])=>{ txt+='\n'+p+':\n  מידות: '; Object.entries(d.sizes).forEach(([s,q])=>txt+=s+': '+q+', '); txt+='סה"כ: '+Object.values(d.sizes).reduce((a,b)=>a+b,0)+'\n'; if(Object.keys(d.extras).length){txt+='  גלופות: ';Object.entries(d.extras).forEach(([e,q])=>txt+=e+': '+q+', ');txt+='\n';} });
   txt+='\n== מזמינים ==\n';
-  orders.forEach((o,i)=>{ txt+=(i+1)+'. '+o.name+(o.phone?' ('+o.phone+')':'')+(o.email?' ['+o.email+']':'')+' | '+o.orderNum+'\n'; o.items.forEach(it=>txt+='   • '+it.product+' '+it.size+' ×'+it.qty+(it.lineTotal?' ₪'+it.lineTotal:'')+'\n'); if(o.notes)txt+='   📝 '+o.notes+'\n'; });
+  orders.forEach((o,i)=>{ txt+=(i+1)+'. '+o.name+(o.phone?' ('+o.phone+')':'')+(o.email?' ['+o.email+']':'')+' | '+o.orderNum+(o.station?' | 📍'+o.station+(o.deliveryType==='deliver'?' 🚚'+(o.address?' '+o.address:''):(o.deliveryType==='pickup'?' 🏠':'')): '')+'\n'; o.items.forEach(it=>txt+='   • '+it.product+' '+it.size+' ×'+it.qty+(it.lineTotal?' ₪'+it.lineTotal:'')+'\n'); if(o.notes)txt+='   📝 '+o.notes+'\n'; });
   txt+='\nסה"כ: ₪'+orders.reduce((s,o)=>s+(o.total||0),0);
   try{navigator.clipboard.writeText(txt).then(()=>showToast('📋 הועתק!'));}catch(e){}
 }
 function exportCSV(){
   var orders=Object.values(D.orders);
-  var rows=[['#','מס הזמנה','שם','טלפון','אימייל','מוצר','מידה','כמות','תוספות','עלות','סה"כ','סטטוס','תשלום','תאריך']];
-  orders.forEach((o,i)=>o.items.forEach((it,j)=>{ rows.push([i+1,j===0?o.orderNum:'',j===0?o.name:'',j===0?o.phone:'',j===0?o.email||'':'',it.product,it.size,it.qty,(it.extras||[]).join(';'),it.lineTotal||0,j===0?o.total||0:'',j===0?slbl(o.status):'',j===0?o.payMethod||'':'',j===0?o.date:'']); }));
+  var rows=[['#','מס הזמנה','שם','טלפון','אימייל','תחנה','איסוף/משלוח','כתובת','מוצר','מידה','כמות','תוספות','עלות','סה"כ','סטטוס','תשלום','תאריך']];
+  orders.forEach((o,i)=>o.items.forEach((it,j)=>{ rows.push([i+1,j===0?o.orderNum:'',j===0?o.name:'',j===0?o.phone:'',j===0?o.email||'':'',j===0?o.station||'':'',j===0?(o.deliveryType==='deliver'?'משלוח':o.deliveryType==='pickup'?'איסוף מהתחנה':''):'',j===0?o.address||'':'',it.product,it.size,it.qty,(it.extras||[]).join(';'),it.lineTotal||0,j===0?o.total||0:'',j===0?slbl(o.status):'',j===0?o.payMethod||'':'',j===0?o.date:'']); }));
   var csv='\uFEFF'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='הזמנות_מדא.csv';a.click();showToast('📥 מוריד...');
 }
@@ -2056,6 +2114,7 @@ function renderSettings(){
   document.getElementById('s-orgname').value=D.settings.orgname||'';
   document.getElementById('s-deadline').value=D.settings.deadline||'';
   refreshPayToggles();
+  refreshStationToggle();
   renderExtrasList();
   // s-pwd הוסר – סיסמה מנוהלת ע"י Firebase Auth
   var orders=Object.values(D.orders);
@@ -2104,6 +2163,26 @@ async function togglePayMethod(key){
   D.settings[key]=D.settings[key]===false?true:false;
   await saveSettings(); refreshPayToggles(); applyPaymentVisibility();
   showToast((D.settings[key]?'✅ הופעל':'⛔ כובה')+' – '+({bitEnabled:'ביט',payboxEnabled:'PayBox',bankEnabled:'העברה בנקאית',cashEnabled:'מזומן'}[key]||''));
+}
+
+// ══ STATION / DELIVERY ══
+function setDeliveryType(type){
+  _deliveryType=type;
+  var pu=document.getElementById('dtog-pickup'); if(pu) pu.classList.toggle('on',type==='pickup');
+  var de=document.getElementById('dtog-deliver'); if(de) de.classList.toggle('on',type==='deliver');
+  var af=document.getElementById('address-field'); if(af) af.style.display=type==='deliver'?'':'none';
+}
+function applyStationSection(){
+  var sec=document.getElementById('station-section');
+  if(sec) sec.style.display=D.settings.stationEnabled?'':'none';
+}
+async function toggleStation(){
+  D.settings.stationEnabled=!D.settings.stationEnabled;
+  await saveSettings(); refreshStationToggle(); applyStationSection();
+  showToast(D.settings.stationEnabled?'✅ שדות תחנה הופעלו':'⛔ שדות תחנה כובו');
+}
+function refreshStationToggle(){
+  _payToggleBtn('s-station-toggle', D.settings.stationEnabled!==false&&D.settings.stationEnabled, '✅ פעיל','⛔ כבוי');
 }
 
 // ══ PAUSE / RESUME ══
