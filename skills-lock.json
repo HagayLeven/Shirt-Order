@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "hebrew-document-generator": {
+      "source": "skills-il/localization",
+      "sourceType": "github",
+      "computedHash": "9b0470bfc32800bcf6dd307abd53cdada1adb408c9a095cb275a2422668b9896"
+    }
+  }
+}
